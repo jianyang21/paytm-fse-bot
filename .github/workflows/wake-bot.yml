@@ -1,0 +1,23 @@
+# Render's free plan sleeps after 15 min without traffic, which also stops the bot's scheduler.
+# This wakes the bot just before each job window (plus two catch-up pings, since GitHub cron can
+# run late). The bot itself decides what's due and runs each job once per day (job_run table).
+# Times are UTC; IST = UTC + 5:30. Set the repo variable BOT_URL to the Render URL.
+name: wake-bot
+on:
+  schedule:
+    - cron: "55 2,12 * * *"    # 08:25 IST (morning 08:30), 18:25 IST (reviews 18:30)
+    - cron: "10,30 3,13 * * *" # 08:40, 09:00 / 18:40, 19:00 IST: catch-up
+    - cron: "25,40 14 * * *"   # 19:55 IST (evening 20:00), 20:10 IST: catch-up
+    - cron: "0 15 * * *"       # 20:30 IST: catch-up
+  workflow_dispatch: {}
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake the bot
+        env:
+          BOT_URL: ${{ vars.BOT_URL }}
+        run: |
+          test -n "$BOT_URL" || { echo "Set the repo variable BOT_URL"; exit 1; }
+          curl -fsS -m 120 --retry 3 --retry-delay 15 --retry-all-errors "$BOT_URL/"
