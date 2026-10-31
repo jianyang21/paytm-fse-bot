@@ -154,14 +154,45 @@ def test_jobs_run_on_their_own_once_per_day_with_catch_up(store, monkeypatch):
     assert ran == ["morning"]  # on time, once
     bot._claimed.clear()  # restart/deploy: in-memory state gone, DB claim still holds
     at(9, 0)
-    assert ran == ["morning", "collections_brief"]  # morning not re-run; 9 am brief is due
+    # morning not re-run; the 9 am collections brief and KAM digest are due
+    assert ran == ["morning", "collections_brief", "kam_digest"]
     at(19, 10)  # bot was asleep at 18:30 and woke at 19:10: catch up
-    assert ran == ["morning", "collections_brief", "reviews"]
+    assert ran == ["morning", "collections_brief", "kam_digest", "reviews"]
     at(20, 0)
     at(23, 0)  # evening window over: not sent late; the 22:00-23:59 health check runs
-    full_day = ["morning", "collections_brief", "reviews", "evening", "health"]
+    full_day = ["morning", "collections_brief", "kam_digest", "reviews", "evening", "health"]
     assert ran == full_day
     at(13, 0, day=2)  # asleep all morning (window ends 12:00): no stale plan at 1 pm
     assert ran == full_day
     at(8, 30, day=3)
     assert ran[-1] == "morning"  # next day runs again
+
+
+def test_kam_digest_fires_at_nine_in_its_configured_timezone(monkeypatch):
+    """Fake clock, in-memory job claims: no database needed."""
+    from datetime import UTC, datetime
+    from zoneinfo import ZoneInfo
+
+    claims: set = set()
+
+    class FakeStore:
+        @staticmethod
+        def claim_job(job, day):
+            if (job, day) in claims:
+                return False
+            claims.add((job, day))
+            return True
+
+    monkeypatch.setattr(bot, "store", lambda: FakeStore)
+    monkeypatch.setattr(bot, "_claimed", set())
+    monkeypatch.setattr(bot, "JOBS", [j for j in bot.JOBS if j[0] == "kam_digest"])
+    ran: list[datetime] = []
+    clock: list[datetime] = []
+    monkeypatch.setattr(bot, "job_fn", lambda name: lambda: ran.append(clock[-1]))
+    for day, tz in ((1, "Asia/Kolkata"), (2, "Asia/Dubai")):
+        monkeypatch.setitem(bot.JOB_TZ, "kam_digest", ZoneInfo(tz))
+        ran.clear()
+        for hh, mm in ((8, 59), (9, 0), (9, 1), (11, 59), (12, 0)):
+            clock.append(datetime(2026, 11, day, hh, mm, tzinfo=ZoneInfo(tz)).astimezone(UTC))
+            bot.run_due_jobs(clock[-1])  # the bot's clock may be in any zone
+        assert [r.astimezone(ZoneInfo(tz)).strftime("%H:%M") for r in ran] == ["09:00"], tz

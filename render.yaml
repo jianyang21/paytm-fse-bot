@@ -41,3 +41,6 @@ services:
         sync: false
       - key: SUPPORT_AGENT_TOKEN
         sync: false
+      # KAM digest: outbox (default) or resend
+      - key: KAM_DELIVERY
+        sync: false

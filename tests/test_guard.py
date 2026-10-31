@@ -1,4 +1,12 @@
-from teammates.guard import InputGuard, mask_email, mask_pii, text_problems, wrap_untrusted
+from teammates.guard import (
+    InputGuard,
+    mask_email,
+    mask_pii,
+    recipient_problems,
+    scope_problems,
+    text_problems,
+    wrap_untrusted,
+)
 
 
 def test_scan_normalises_and_flags_nothing_on_clean_text():
@@ -46,3 +54,21 @@ def test_output_guard_numbers_must_come_from_facts():
     assert text_problems("Settlement S-40102 of ₹9,350 is pending.",
                          "settlement S-40102: ₹9,350, pending") == []
     assert text_problems("Refund ₹7,500 today", "refund ₹750") == ["numbers not in the data: 7500"]
+
+
+def test_recipient_guard_for_scheduled_emails():
+    ok = dict(verified=True, role="kam", want_role="kam", scope=[102], what="digest",
+              scope_name="key accounts")
+    assert recipient_problems("kam@example.com", **ok) == []
+    assert recipient_problems("kam@example.com", **ok | {"verified": False}) == [
+        "recipient email not verified"]
+    assert recipient_problems("x@y.com, z@evil.io", **ok) == ["recipient email invalid"]
+    assert recipient_problems("kam@example.com", **ok | {"role": "support_agent", "scope": []}
+                              ) == ["role support_agent does not receive the digest",
+                                    "no key accounts assigned"]
+
+
+def test_scope_guard():
+    assert scope_problems([102, 104], [102, 104, 108], "KAM's key accounts") == []
+    assert scope_problems(["Bellandur", "Whitefield"], ["Bellandur"], "manager's areas") == [
+        "data outside the manager's areas: Whitefield"]

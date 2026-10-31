@@ -123,3 +123,35 @@ def test_pg_stores_sql_payload_verbatim_and_has_indexes(pg):
         idx = {r["indexname"] for r in c.execute(
             "SELECT indexname FROM pg_indexes WHERE tablename = 'ticket'")}
     assert {"ticket_merchant_status_idx", "ticket_status_idx"} <= idx
+
+
+def test_kam_digest_reads(store):
+    """queue(since) keeps every AI-resolved ticket since then (no cap), signal and by_role."""
+    kam = {"role": "kam", "email": "kam@example.com"}
+    fresh = [new(store, status="resolved", route="auto", assigned_role="kam",
+                 assigned_to="kam@example.com") for _ in range(25)]
+    old = new(store, status="resolved", route="auto", assigned_role="kam",
+              assigned_to="kam@example.com")
+    then = datetime(2026, 10, 1, tzinfo=UTC)
+    if isinstance(store, MemoryStore):
+        store.tickets[101, old["id"]]["updated_at"] = then
+    else:
+        with store.pool.connection() as c:
+            c.execute("UPDATE ticket SET updated_at = %s WHERE id = %s", (then, old["id"]))
+    since = datetime(2026, 10, 20, tzinfo=UTC)
+    assert sorted(t["id"] for t in store.queue(kam, since=since)["fyi"]) == sorted(
+        t["id"] for t in fresh)
+    assert len(store.queue(kam)["fyi"]) == (26 if isinstance(store, MemoryStore) else 20)
+    assert store.signal(101) is None
+    store.add_friction(101, 1, 2, "auto_resolved")
+    assert (store.signal(101)["friction"], store.signal(101)["tickets"]) == (2, 1)
+    store.upsert_reviewer("kam@example.com", "pw", "Anita", "kam")
+    store.upsert_reviewer("agent@example.com", "pw", "Agent", "support_agent")
+    assert [r["email"] for r in store.by_role("kam")] == ["kam@example.com"]
+
+
+def test_memory_store_message_log_masks_recipient():
+    s = MemoryStore()
+    s.log_message("out", "kam@example.com", "email", "Digest", False, http_status=503)
+    assert s.messages == [{"direction": "out", "to_masked": "ka***@example.com", "kind": "email",
+                           "body": "Digest", "ok": False, "http_status": 503}]

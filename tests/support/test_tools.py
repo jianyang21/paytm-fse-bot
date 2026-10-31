@@ -77,3 +77,16 @@ def test_cache_down_calls_the_tool():
     assert c.get_or_fetch(1, 1, "txns", lambda: [1]) == ([1], False)
     c.invalidate(1, 1)  # no exception
     assert ContextCache(None, TTLS).get_or_fetch(1, 1, "txns", lambda: [2]) == ([2], False)
+
+
+def test_cached_any_key_with_its_own_ttl():
+    r = fakeredis.FakeRedis()
+    c, calls = ContextCache(r, TTLS), []
+
+    def fetch():
+        calls.append(1)
+        return [{"a": 1}]
+
+    assert c.cached("kam:x:2026-10-31:meetings", 900, fetch) == ([{"a": 1}], False)
+    assert c.cached("kam:x:2026-10-31:meetings", 900, fetch) == ([{"a": 1}], True)
+    assert len(calls) == 1 and 0 < r.ttl("kam:x:2026-10-31:meetings") <= 900
