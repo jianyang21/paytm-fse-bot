@@ -245,6 +245,16 @@ def test_application_flow_guards_checks_and_rbac(client, store):
                for s in store.spans)
 
 
+def test_logout_drops_basic_auth_then_login_returns_to_inbox(client):
+    h = auth("asha@example.com")
+    assert 'href="/collections/logout"' in client.get("/collections", headers=h).get_data(True)
+    out = client.get("/collections/logout", headers=h)
+    assert out.status_code == 401 and "WWW-Authenticate" in out.headers  # browser forgets login
+    back = client.get("/collections/logout", headers=h)  # login typed into that prompt
+    assert back.status_code == 303 and back.headers["Location"].endswith("/collections")
+    assert client.get("/collections/logout", headers=h).status_code == 401  # cookie cleared
+
+
 def test_plan_check_failure_never_auto_passes(store, wired, monkeypatch):
     monkeypatch.setattr(coll, "llm", lambda: FakeLLM(lambda r: "not json"))
     b = store.borrower_by_phone("919800000009")

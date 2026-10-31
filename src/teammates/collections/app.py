@@ -549,7 +549,10 @@ border-left:3px solid #4a6fa5;padding:8px 12px;margin:8px 0}button{padding:8px 1
 border-radius:6px;color:#fff;font-size:15px;cursor:pointer}input[name=note]{width:100%;
 padding:6px;box-sizing:border-box;margin:8px 0}
 </style></head><body>
-<h2 style="max-width:820px;margin:0 auto 4px">Loan applications</h2>
+<div style="max-width:820px;margin:0 auto 4px;display:flex;justify-content:space-between;
+align-items:center"><h2 style="margin:0">Loan applications</h2>
+<a href="{{ url_for('collections.logout') }}" style="background:#555;color:#fff;padding:6px 14px;
+border-radius:6px;text-decoration:none;font-size:14px">Log out</a></div>
 <p class="muted" style="max-width:820px;margin:0 auto 12px">{{ me.email }} &middot;
 {{ me.role.replace('_', ' ') }} &middot; {{ me.areas|join(', ') }}</p>
 {% for a in apps %}{% set b = a.borrower %}<div class="card">
@@ -614,10 +617,32 @@ def require_manager() -> Any:
 
 
 @bp.get("")
-def inbox() -> str:
+def inbox() -> Response:
     m = g.manager
-    return INBOX.render(apps=loan_store().applications_for(m, ist_today()), me=m,
-                        labels=CHECK_LABELS, csrf=_csrf(m), url_for=url_for)
+    resp = Response(INBOX.render(apps=loan_store().applications_for(m, ist_today()), me=m,
+                                 labels=CHECK_LABELS, csrf=_csrf(m), url_for=url_for))
+    if LOGGED_OUT in request.cookies:  # back in: the next Log out click works normally again
+        resp.delete_cookie(LOGGED_OUT, path="/collections")
+    return resp
+
+
+LOGGED_OUT = "logged_out"
+
+
+@bp.get("/logout")
+def logout() -> Response:
+    """Basic auth has no logout: a 401 makes the browser forget the saved login and ask again.
+    The cookie marks that we already did, so logging in from that prompt goes to the inbox
+    instead of logging out again."""
+    if LOGGED_OUT in request.cookies:
+        resp = redirect(url_for("collections.inbox"), 303)
+        resp.delete_cookie(LOGGED_OUT, path="/collections")
+        return resp
+    resp = Response(f'<p style="font-family:system-ui">Logged out. '
+                    f'<a href="{url_for("collections.inbox")}">Log in again</a></p>', 401,
+                    {"WWW-Authenticate": 'Basic realm="collections"'})
+    resp.set_cookie(LOGGED_OUT, "1", path="/collections", httponly=True, samesite="Lax")
+    return resp
 
 
 @bp.post("/applications")
