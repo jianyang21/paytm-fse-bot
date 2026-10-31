@@ -55,3 +55,26 @@ def test_free_text_is_feedback_and_strangers_are_ignored(sent):
     assert sent[-1]["text"] == "📝 Noted, thanks!"
     with bot.db() as con:
         assert con.execute("SELECT body FROM feedback").fetchone()[0] == "Ravi wants 2 more"
+
+
+def test_evening_asks_why_per_unfinished_task(sent):
+    for n in ("1", "2", "3"):  # Ravi, Lakshmi, Anand done; Sri Medicals, Green Leaf left
+        bot.handle_inbound({"from": PHONE, "message_type": "text", "text": n})
+    bot.send_evening()
+    ask = sent[-1]["custom"]["interactive"]
+    assert ask["body"]["text"] == "❓ QR replacement at Sri Medicals wasn't done today. Why?"
+    closed = next(r for r in rows(sent[-1]) if r["title"] == "Shop closed")
+
+    bot.handle_inbound({"from": PHONE, "message_type": "reply", "reply": closed})
+    assert "Green Leaf Cafe" in sent[-1]["custom"]["interactive"]["body"]["text"]
+    other = next(r for r in rows(sent[-1]) if r["id"].endswith(":other"))
+
+    bot.handle_inbound({"from": PHONE, "message_type": "reply", "reply": other})
+    assert sent[-1]["text"] == "✍️ Type why Green Leaf Cafe wasn't done."
+    bot.handle_inbound({"from": PHONE, "message_type": "text", "text": "owner travelling"})
+    assert sent[-1]["text"].startswith("🙏 Thanks! Any merchant feedback")
+
+    with bot.db() as con:
+        got = dict(con.execute("SELECT merchant, reason FROM task WHERE reason IS NOT NULL"))
+        assert got == {"Sri Medicals": "closed", "Green Leaf Cafe": "other: owner travelling"}
+        assert con.execute("SELECT COUNT(*) FROM feedback").fetchone()[0] == 0
