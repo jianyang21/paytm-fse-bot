@@ -1,0 +1,67 @@
+# FSE workflow eval: a whole simulated day (morning plan, replies, reviews, evening, health)
+# plus injected faults, through the real bot code on a throwaway Postgres schema.
+# Runs every day at 06:00 IST, or by hand:
+#   gh workflow run fse-eval.yml -f fses=50
+# Needs the repo secret TEST_DATABASE_URL (Neon, direct non -pooler string). Results: the run's
+# summary page (every metric, pass/fail, failure details) + the "fse-eval-report" artifact.
+# A failed metric fails the run, and GitHub emails the repo owner.
+name: fse-eval
+on:
+  schedule:
+    - cron: "30 0 * * *" # 06:00 IST (UTC + 5:30)
+  workflow_dispatch:
+    inputs:
+      fses:
+        description: "How many simulated FSEs"
+        default: "20"
+      seed:
+        description: "Random seed (same seed = same scenario)"
+        default: "7"
+jobs:
+  fse-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+      FSES: ${{ inputs.fses || '20' }}
+      SEED: ${{ inputs.seed || '7' }}
+      OUT: reports/fse_eval/latest.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install ".[dev]"
+      - name: Run eval
+        run: |
+          test -n "$TEST_DATABASE_URL" || { echo "Set the repo secret TEST_DATABASE_URL"; exit 1; }
+          python -m teammates.fse.evals --fses "$FSES" --seed "$SEED" --out "$OUT"
+      - name: Summary
+        if: always()
+        run: |
+          python - <<'EOF'
+          import json, os
+          path = os.environ["OUT"]
+          if not os.path.exists(path):
+              raise SystemExit("no report: the eval crashed before finishing, see the step above")
+          r = json.load(open(path))
+          cell = lambda s: str(s).replace("|", "\\|").replace("\n", " ")
+          md = [f"## FSE eval: {'✅ all passed' if r['passed'] else '❌ failed'}", "",
+                f"{r['fses']} FSEs, seed {r['seed']}, run at {r['run_at']}", "",
+                "| Metric | Score | Threshold | Checks |", "|---|---|---|---|"]
+          for name, m in r["metrics"].items():
+              mark = "✅" if m["passed"] else "❌"
+              md.append(f"| {name} | {mark} {m['score']:.3f} | {m['threshold']} | {m['checks']} |")
+          for name, m in r["metrics"].items():
+              if m["failures"]:
+                  md += ["", f"### {name}: what failed", ""]
+                  md += [f"- {cell(f)}" for f in m["failures"]]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
+              f.write("\n".join(md) + "\n")
+          EOF
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fse-eval-report
+          path: reports/fse_eval

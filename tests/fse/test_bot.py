@@ -84,3 +84,84 @@ def test_evening_asks_why_per_unfinished_task(sent, store):
         assert day == {"total": 5, "done": 3, "not_done": 2,
                        "reasons": {"closed": 1, "other": 1}}
         assert conn.execute("SELECT count(*) AS n FROM feedback").fetchone()["n"] == 0
+
+
+def test_shared_location_updates_fse_table(sent, store):
+    bot.handle_inbound({"from": PHONE, "message_type": "location",
+                        "location": {"lat": 12.95, "long": 77.70, "name": "HSR Layout"}})
+    assert sent[-1]["text"] == "📍 Location saved."
+    assert {k: store.fse_by_phone(PHONE)[k] for k in ("address", "lat", "lng")} == {
+        "address": "HSR Layout", "lat": 12.95, "lng": 77.70}
+    bot.handle_inbound({"from": PHONE, "message_type": "location", "location": {"lat": "x"}})
+    assert sent[-1]["text"].startswith("⚠️ Couldn't read that location")
+
+
+def test_done_tasks_and_customer_reviews_are_saved_per_merchant(sent, store):
+    for n in ("1", "2"):  # Ravi Stores, Lakshmi Bakery done
+        bot.handle_inbound({"from": PHONE, "message_type": "text", "text": n})
+    bot.send_reviews()
+    assert sent[-1]["text"].startswith("⭐ What did Ravi Stores say")
+    bot.handle_inbound({"from": PHONE, "message_type": "text", "text": "Wants 2 more Soundboxes"})
+    assert sent[-1]["text"].startswith("⭐ What did Lakshmi Bakery say")
+    bot.handle_inbound({"from": PHONE, "message_type": "audio",
+                        "audio": {"url": "https://example.com/v.ogg"}})
+    assert sent[-1]["text"] == "🙏 Thanks, all customer reviews saved."
+    bot.handle_inbound({"from": "910000000000", "message_type": "text", "text": "fake review"})
+
+    with store.pool.connection() as conn:
+        done = conn.execute(
+            "SELECT m.name, t.done_at IS NOT NULL AS has_time, p.status AS project"
+            " FROM task t JOIN merchant m ON m.id = t.merchant_id"
+            " JOIN project p ON p.id = t.project_id WHERE t.status = 'done' ORDER BY t.id"
+        ).fetchall()
+        events = conn.execute("SELECT count(*) AS n FROM task_event WHERE type = 'done'"
+                              ).fetchone()["n"]
+        reviews = conn.execute(
+            "SELECT m.name, r.body, r.audio_url FROM review r"
+            " JOIN merchant m ON m.id = r.merchant_id ORDER BY r.id").fetchall()
+    assert {r["name"] for r in done} == {"Ravi Stores", "Lakshmi Bakery"}
+    assert all(r["has_time"] and r["project"] == "closed" for r in done) and events == 2
+    assert [tuple(r.values()) for r in reviews] == [
+        ("Ravi Stores", "Wants 2 more Soundboxes", None),
+        ("Lakshmi Bakery", None, "https://example.com/v.ogg")]
+
+
+def test_review_window_closes_at_8pm(sent, store):
+    bot.handle_inbound({"from": PHONE, "message_type": "text", "text": "1"})
+    bot.send_reviews()  # asks about Ravi Stores, FSE doesn't answer
+    bot.send_evening()  # 8 pm: unanswered question dropped, asks why instead
+    assert "wasn't done today. Why?" in body(sent[-1])
+    with store.pool.connection() as conn:
+        assert conn.execute("SELECT count(*) AS n FROM review").fetchone()["n"] == 0
+
+
+def test_jobs_run_on_their_own_once_per_day_with_catch_up(store, monkeypatch):
+    from datetime import datetime
+
+    from teammates.fse.store import IST
+    monkeypatch.setattr(bot, "store", lambda: store)
+    monkeypatch.setattr(bot, "_claimed", set())
+    ran: list[str] = []
+    monkeypatch.setattr(bot, "job_fn", lambda name: lambda: ran.append(name))
+
+    def at(hh, mm, day=1):
+        bot.run_due_jobs(datetime(2026, 11, day, hh, mm, tzinfo=IST))
+
+    at(8, 29)
+    assert ran == []  # before the window
+    at(8, 30)
+    at(8, 31)
+    assert ran == ["morning"]  # on time, once
+    bot._claimed.clear()  # restart/deploy: in-memory state gone, DB claim still holds
+    at(9, 0)
+    assert ran == ["morning", "collections_brief"]  # morning not re-run; 9 am brief is due
+    at(19, 10)  # bot was asleep at 18:30 and woke at 19:10: catch up
+    assert ran == ["morning", "collections_brief", "reviews"]
+    at(20, 0)
+    at(23, 0)  # evening window over: not sent late; the 22:00-23:59 health check runs
+    full_day = ["morning", "collections_brief", "reviews", "evening", "health"]
+    assert ran == full_day
+    at(13, 0, day=2)  # asleep all morning (window ends 12:00): no stale plan at 1 pm
+    assert ran == full_day
+    at(8, 30, day=3)
+    assert ran[-1] == "morning"  # next day runs again

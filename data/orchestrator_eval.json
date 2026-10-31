@@ -1,0 +1,7 @@
+[
+  {"id": 1, "query": "Resolve support ticket #4921", "party": {"type": "merchant", "id": "M_101"}, "expected": ["support"]},
+  {"id": 2, "query": "Check loan health and overdue recovery for merchant M_202", "party": {"type": "merchant", "id": "M_202"}, "expected": ["collections"]},
+  {"id": 3, "query": "Resolve support ticket #8812 and check their collection status", "party": {"type": "merchant", "id": "M_303"}, "expected": ["support", "collections"]},
+  {"id": 4, "query": "Mark daily store visit done for HSR layout FSE", "party": null, "expected": ["fse"]},
+  {"id": 5, "query": "Give me the team lead overview on active FSE states and tickets", "party": null, "expected": ["copilot"]}
+]

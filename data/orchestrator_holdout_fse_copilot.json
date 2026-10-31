@@ -1,0 +1,1928 @@
+[
+ {
+  "id": 1,
+  "category": "fse/terse_update",
+  "query": "#4 done 🙏",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 2,
+  "category": "fse/terse_update",
+  "query": "FYI 2 ho gaya",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 3,
+  "category": "fse/own_day",
+  "query": "Pls End of day note: Coastal Fish Market wants another standee for the second counter - urgent",
+  "party": {
+   "type": "merchant",
+   "id": "M_1758"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 4,
+  "category": "copilot/team_management",
+  "query": "Pls Team ki is hafte ki performance ka summary do - urgent",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 5,
+  "category": "fse/manager_action",
+  "query": "FYI Move Manoj's Udupi Grand appointment to next week pls",
+  "party": {
+   "type": "merchant",
+   "id": "M_1530"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 6,
+  "category": "copilot/team_analysis",
+  "query": "Is the BTM Layout team on track for the monthly target? ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 7,
+  "category": "copilot/team_analysis",
+  "query": "Hi, Mere FSEs mein se kaun peeche chal raha hai? - urgent",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 8,
+  "category": "copilot/team_analysis",
+  "query": "Who on my team has the lowest visit completion this week? ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 9,
+  "category": "fse/terse_update",
+  "query": "8 ho gaya ?",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 10,
+  "category": "fse/own_day",
+  "query": "End of day note: Sagar Sweets wants another standee for the second counter",
+  "party": {
+   "type": "merchant",
+   "id": "M_1854"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 11,
+  "category": "copilot/team_analysis",
+  "query": "Mere FSEs mein se kaun peeche chal raha hai? - urgent",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 12,
+  "category": "fse/manager_action",
+  "query": "Hi, Prakash ko aaj ki list bhej do",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 13,
+  "category": "fse/terse_update",
+  "query": "visit 3 finished ok",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 14,
+  "category": "fse/own_day",
+  "query": "Which shop should I cover after New Delhi Chaat?",
+  "party": {
+   "type": "merchant",
+   "id": "M_1539"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 15,
+  "category": "fse/manager_action",
+  "query": "Add Moti Mahal Biryani to Kiran's visits for Thursday pls",
+  "party": {
+   "type": "merchant",
+   "id": "M_1513"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 16,
+  "category": "fse/terse_update",
+  "query": "Hi, #3 done",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 17,
+  "category": "fse/manager_action",
+  "query": "Add Moti Mahal Biryani to Prakash's visits for Thursday",
+  "party": {
+   "type": "merchant",
+   "id": "M_1544"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 18,
+  "category": "copilot/team_analysis",
+  "query": "Boss, Spot any FSE whose completion rate dropped compared to last week",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 19,
+  "category": "fse/terse_update",
+  "query": "task 9 khatam ok",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 20,
+  "category": "copilot/team_management",
+  "query": "Boss, Draft talking points for Monday's team meeting ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 21,
+  "category": "copilot/team_analysis",
+  "query": "Compare the Yelahanka and Hebbal teams on onboarding numbers ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 22,
+  "category": "fse/terse_update",
+  "query": "Boss, kaam 9 poora hua pls",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 23,
+  "category": "copilot/team_analysis",
+  "query": "How many tasks did my team complete today versus plan? - urgent",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 24,
+  "category": "fse/terse_update",
+  "query": "FYI completed task number 5",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 25,
+  "category": "fse/terse_update",
+  "query": "FYI 3 complete ✅ ok",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 26,
+  "category": "fse/own_day",
+  "query": "FYI मेरे आज के काम क्या हैं?",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 27,
+  "category": "fse/terse_update",
+  "query": "Pls #6 done - urgent",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 28,
+  "category": "copilot/team_analysis",
+  "query": "FYI Is the Marathahalli team on track for the monthly target? 🙏",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 29,
+  "category": "copilot/team_management",
+  "query": "Boss, Suggest how to split Hebbal between Deepa and Kiran",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 30,
+  "category": "copilot/team_analysis",
+  "query": "Rank my FSEs by Soundbox installs this month 🙏",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 31,
+  "category": "copilot/team_analysis",
+  "query": "Hi, Rank my FSEs by Soundbox installs this month",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 32,
+  "category": "copilot/team_management",
+  "query": "Team ki is hafte ki performance ka summary do",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 33,
+  "category": "copilot/team_analysis",
+  "query": "Is Manoj improving or slipping on daily targets? ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 34,
+  "category": "copilot/team_management",
+  "query": "Suggest how to split Yelahanka between Imran and Kiran ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 35,
+  "category": "copilot/team_management",
+  "query": "Weekly review of visits, tickets and collections for my whole team ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 36,
+  "category": "copilot/team_analysis",
+  "query": "Pls Spot any FSE whose completion rate dropped compared to last week pls",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 37,
+  "category": "copilot/team_management",
+  "query": "Draft talking points for Monday's team meeting ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 38,
+  "category": "copilot/team_management",
+  "query": "Team ki is hafte ki performance ka summary do pls",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 39,
+  "category": "fse/manager_action",
+  "query": "Share the visit list with all field executives in Hebbal",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 40,
+  "category": "fse/own_day",
+  "query": "मेरे आज के काम क्या हैं?",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 41,
+  "category": "fse/own_day",
+  "query": "Hi, QR standee placed at New Delhi Chaat, tick it off",
+  "party": {
+   "type": "merchant",
+   "id": "M_1470"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 42,
+  "category": "copilot/team_management",
+  "query": "Weekly review of visits, tickets and collections for my whole team - urgent",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 43,
+  "category": "fse/terse_update",
+  "query": "6 ho gaya 🙏",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 44,
+  "category": "copilot/team_analysis",
+  "query": "Pls Rank my FSEs by Soundbox installs this month",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 45,
+  "category": "fse/own_day",
+  "query": "Hi, मेरे आज के काम क्या हैं? pls",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 46,
+  "category": "fse/own_day",
+  "query": "FYI I reached Lucky Footwear, starting the onboarding now - urgent",
+  "party": {
+   "type": "merchant",
+   "id": "M_1737"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 47,
+  "category": "fse/manager_action",
+  "query": "Ask the Malleshwaram field team to bring their driving licence tomorrow 🙏",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 48,
+  "category": "copilot/team_analysis",
+  "query": "FYI Spot any FSE whose completion rate dropped compared to last week",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 49,
+  "category": "copilot/team_analysis",
+  "query": "Give me a 3-line summary of how the field team did yesterday",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 50,
+  "category": "copilot/team_analysis",
+  "query": "Spot any FSE whose completion rate dropped compared to last week ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 51,
+  "category": "copilot/team_analysis",
+  "query": "FYI Spot any FSE whose completion rate dropped compared to last week pls",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 52,
+  "category": "copilot/team_management",
+  "query": "Hi, Weekly review of visits, tickets and collections for my whole team ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 53,
+  "category": "copilot/team_analysis",
+  "query": "How many tasks did my team complete today versus plan?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 54,
+  "category": "copilot/team_management",
+  "query": "Weekly review of visits, tickets and collections for my whole team",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 55,
+  "category": "copilot/team_analysis",
+  "query": "Compare the Malleshwaram and BTM Layout teams on onboarding numbers pls",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 56,
+  "category": "fse/manager_action",
+  "query": "Pls Add Coastal Fish Market to Lakshmi's visits for Thursday ok",
+  "party": {
+   "type": "merchant",
+   "id": "M_1017"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 57,
+  "category": "copilot/team_management",
+  "query": "Pls Draft talking points for Monday's team meeting ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 58,
+  "category": "fse/own_day",
+  "query": "Boss, मेरे आज के काम क्या हैं? pls",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 59,
+  "category": "fse/own_day",
+  "query": "FYI Nandini Milk Parlour was shut when I went, move it to Friday",
+  "party": {
+   "type": "merchant",
+   "id": "M_1003"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 60,
+  "category": "fse/manager_action",
+  "query": "FYI Add Coastal Fish Market to Imran's visits for Thursday 🙏",
+  "party": {
+   "type": "merchant",
+   "id": "M_1323"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 61,
+  "category": "copilot/team_management",
+  "query": "Hi, Weekly review of visits, tickets and collections for my whole team",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 62,
+  "category": "fse/manager_action",
+  "query": "FYI Push tomorrow's beat plan to Manoj in Malleshwaram 🙏",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 63,
+  "category": "copilot/team_management",
+  "query": "Hi, Suggest how to split Marathahalli between Prakash and Nisha",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 64,
+  "category": "fse/own_day",
+  "query": "What's on my route for today in Malleshwaram? 🙏",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 65,
+  "category": "fse/own_day",
+  "query": "I reached Durga Pharma, starting the onboarding now ?",
+  "party": {
+   "type": "merchant",
+   "id": "M_1736"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 66,
+  "category": "fse/manager_action",
+  "query": "Imran ko aaj ki list bhej do ok",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 67,
+  "category": "copilot/team_analysis",
+  "query": "Boss, Give me a 3-line summary of how the field team did yesterday pls",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 68,
+  "category": "fse/terse_update",
+  "query": "FYI 4 complete ✅ pls",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 69,
+  "category": "copilot/team_analysis",
+  "query": "Boss, Mere FSEs mein se kaun peeche chal raha hai? ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 70,
+  "category": "fse/manager_action",
+  "query": "Add Durga Pharma to Prakash's visits for Thursday ?",
+  "party": {
+   "type": "merchant",
+   "id": "M_1249"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 71,
+  "category": "fse/own_day",
+  "query": "Nandini Milk Parlour was shut when I went, move it to Friday pls",
+  "party": {
+   "type": "merchant",
+   "id": "M_1828"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 72,
+  "category": "copilot/team_management",
+  "query": "Boss, Suggest how to split Malleshwaram between Deepa and Imran 🙏",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 73,
+  "category": "copilot/team_analysis",
+  "query": "FYI How many tasks did my team complete today versus plan? 🙏",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 74,
+  "category": "fse/manager_action",
+  "query": "Hi, Assign the Moti Mahal Biryani Soundbox install to Nisha 🙏",
+  "party": {
+   "type": "merchant",
+   "id": "M_1952"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 75,
+  "category": "fse/terse_update",
+  "query": "Hi, task 3 khatam",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 76,
+  "category": "copilot/team_analysis",
+  "query": "FYI Compare the Malleshwaram and Yelahanka teams on onboarding numbers",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 77,
+  "category": "fse/manager_action",
+  "query": "Move Imran's Udupi Grand appointment to next week 🙏",
+  "party": {
+   "type": "merchant",
+   "id": "M_1715"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 78,
+  "category": "copilot/team_management",
+  "query": "Boss, Who should I pair with the new joiner for training?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 79,
+  "category": "copilot/team_analysis",
+  "query": "How many tasks did my team complete today versus plan? 🙏",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 80,
+  "category": "fse/own_day",
+  "query": "End of day note: Sagar Sweets wants another standee for the second counter ?",
+  "party": {
+   "type": "merchant",
+   "id": "M_1006"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 81,
+  "category": "fse/own_day",
+  "query": "FYI How many stops are left on my list? ?",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 82,
+  "category": "fse/terse_update",
+  "query": "Pls completed task number 8",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 83,
+  "category": "copilot/team_analysis",
+  "query": "Pls Mere FSEs mein se kaun peeche chal raha hai? ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 84,
+  "category": "fse/own_day",
+  "query": "Boss, Which shop should I cover after Shree Ganesh Provisions? ok",
+  "party": {
+   "type": "merchant",
+   "id": "M_1919"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 85,
+  "category": "copilot/team_analysis",
+  "query": "Compare the Marathahalli and BTM Layout teams on onboarding numbers ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 86,
+  "category": "copilot/team_analysis",
+  "query": "Mere FSEs mein se kaun peeche chal raha hai?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 87,
+  "category": "copilot/team_management",
+  "query": "Draft talking points for Monday's team meeting 🙏",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 88,
+  "category": "copilot/team_management",
+  "query": "Hi, Weekly review of visits, tickets and collections for my whole team ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 89,
+  "category": "fse/own_day",
+  "query": "Boss, End of day note: Sagar Sweets wants another standee for the second counter",
+  "party": {
+   "type": "merchant",
+   "id": "M_1646"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 90,
+  "category": "fse/terse_update",
+  "query": "kaam 1 poora hua ok",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 91,
+  "category": "copilot/team_analysis",
+  "query": "Hi, Who on my team has the lowest visit completion this week? - urgent",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 92,
+  "category": "copilot/team_management",
+  "query": "Suggest how to split Marathahalli between Sowmya and Imran",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 93,
+  "category": "fse/manager_action",
+  "query": "Hi, Move Kiran's Moti Mahal Biryani appointment to next week",
+  "party": {
+   "type": "merchant",
+   "id": "M_1486"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 94,
+  "category": "fse/own_day",
+  "query": "Pls QR standee placed at Moti Mahal Biryani, tick it off",
+  "party": {
+   "type": "merchant",
+   "id": "M_1008"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 95,
+  "category": "copilot/team_management",
+  "query": "Team ki is hafte ki performance ka summary do ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 96,
+  "category": "copilot/team_management",
+  "query": "Hi, Suggest how to split Marathahalli between Lakshmi and Nisha ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 97,
+  "category": "fse/terse_update",
+  "query": "7 complete ✅",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 98,
+  "category": "fse/own_day",
+  "query": "Kal Marathahalli mein kitne visits hain mere? ok",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 99,
+  "category": "copilot/team_management",
+  "query": "Who should I pair with the new joiner for training?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 100,
+  "category": "copilot/team_analysis",
+  "query": "Rank my FSEs by Soundbox installs this month ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 101,
+  "category": "copilot/team_management",
+  "query": "Who should I pair with the new joiner for training? - urgent",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 102,
+  "category": "fse/own_day",
+  "query": "Pls Installed 2 Soundboxes at Nandini Milk Parlour, update my checklist ok",
+  "party": {
+   "type": "merchant",
+   "id": "M_1037"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 103,
+  "category": "fse/manager_action",
+  "query": "Add Nandini Milk Parlour to Sowmya's visits for Thursday ?",
+  "party": {
+   "type": "merchant",
+   "id": "M_1122"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 104,
+  "category": "copilot/team_analysis",
+  "query": "Is Deepa improving or slipping on daily targets?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 105,
+  "category": "fse/own_day",
+  "query": "Boss, Installed 2 Soundboxes at Coastal Fish Market, update my checklist ?",
+  "party": {
+   "type": "merchant",
+   "id": "M_1038"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 106,
+  "category": "copilot/team_analysis",
+  "query": "Pls Is the BTM Layout team on track for the monthly target?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 107,
+  "category": "copilot/team_management",
+  "query": "Boss, What should I praise Deepa for in today's stand-up?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 108,
+  "category": "fse/manager_action",
+  "query": "Boss, Push tomorrow's beat plan to Prakash in Malleshwaram 🙏",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 109,
+  "category": "fse/manager_action",
+  "query": "FYI Ask the Yelahanka field team to bring their driving licence tomorrow 🙏",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 110,
+  "category": "fse/manager_action",
+  "query": "Assign the Vinayaka Xerox Soundbox install to Prakash ?",
+  "party": {
+   "type": "merchant",
+   "id": "M_1964"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 111,
+  "category": "copilot/team_analysis",
+  "query": "Pls Give me a 3-line summary of how the field team did yesterday ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 112,
+  "category": "fse/manager_action",
+  "query": "Push tomorrow's beat plan to Imran in Marathahalli",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 113,
+  "category": "fse/terse_update",
+  "query": "Boss, 6 ho gaya pls",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 114,
+  "category": "copilot/team_management",
+  "query": "Boss, Who should I pair with the new joiner for training? pls",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 115,
+  "category": "copilot/team_analysis",
+  "query": "Hi, Who on my team has the lowest visit completion this week?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 116,
+  "category": "fse/terse_update",
+  "query": "Boss, 4 complete ✅ ok",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 117,
+  "category": "fse/own_day",
+  "query": "Boss, I reached Udupi Grand, starting the onboarding now",
+  "party": {
+   "type": "merchant",
+   "id": "M_1153"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 118,
+  "category": "fse/manager_action",
+  "query": "FYI Assign the Tirupati Textiles Soundbox install to Kiran",
+  "party": {
+   "type": "merchant",
+   "id": "M_1399"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 119,
+  "category": "fse/terse_update",
+  "query": "Pls #4 done 🙏",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 120,
+  "category": "fse/own_day",
+  "query": "FYI Vinayaka Xerox was shut when I went, move it to Friday",
+  "party": {
+   "type": "merchant",
+   "id": "M_1633"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 121,
+  "category": "fse/own_day",
+  "query": "Pls I reached Coastal Fish Market, starting the onboarding now ok",
+  "party": {
+   "type": "merchant",
+   "id": "M_1409"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 122,
+  "category": "copilot/team_analysis",
+  "query": "FYI Give me a 3-line summary of how the field team did yesterday 🙏",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 123,
+  "category": "copilot/team_management",
+  "query": "Hi, Who should I pair with the new joiner for training? ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 124,
+  "category": "fse/manager_action",
+  "query": "Hi, Assign the Lucky Footwear Soundbox install to Deepa pls",
+  "party": {
+   "type": "merchant",
+   "id": "M_1162"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 125,
+  "category": "copilot/team_analysis",
+  "query": "Boss, Rank my FSEs by Soundbox installs this month ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 126,
+  "category": "copilot/team_management",
+  "query": "Suggest how to split Banashankari between Sowmya and Imran ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 127,
+  "category": "copilot/team_management",
+  "query": "Pls Who should I pair with the new joiner for training? pls",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 128,
+  "category": "fse/manager_action",
+  "query": "Hi, Move Nisha's Nandini Milk Parlour appointment to next week",
+  "party": {
+   "type": "merchant",
+   "id": "M_1258"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 129,
+  "category": "copilot/team_analysis",
+  "query": "FYI Mere FSEs mein se kaun peeche chal raha hai?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 130,
+  "category": "copilot/team_analysis",
+  "query": "Compare the Yelahanka and BTM Layout teams on onboarding numbers pls",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 131,
+  "category": "fse/terse_update",
+  "query": "1 ho gaya",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 132,
+  "category": "fse/own_day",
+  "query": "Installed 2 Soundboxes at Tirupati Textiles, update my checklist",
+  "party": {
+   "type": "merchant",
+   "id": "M_1135"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 133,
+  "category": "copilot/team_analysis",
+  "query": "Is Kiran improving or slipping on daily targets? - urgent",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 134,
+  "category": "fse/own_day",
+  "query": "How many stops are left on my list?",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 135,
+  "category": "fse/manager_action",
+  "query": "Move Imran's Tirupati Textiles appointment to next week",
+  "party": {
+   "type": "merchant",
+   "id": "M_1461"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 136,
+  "category": "fse/manager_action",
+  "query": "Prakash ko aaj ki list bhej do",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 137,
+  "category": "copilot/team_analysis",
+  "query": "FYI Spot any FSE whose completion rate dropped compared to last week ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 138,
+  "category": "copilot/team_analysis",
+  "query": "Who on my team has the lowest visit completion this week? ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 139,
+  "category": "fse/manager_action",
+  "query": "Assign the Udupi Grand Soundbox install to Lakshmi ?",
+  "party": {
+   "type": "merchant",
+   "id": "M_1530"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 140,
+  "category": "copilot/team_analysis",
+  "query": "FYI Who on my team has the lowest visit completion this week? ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 141,
+  "category": "copilot/team_analysis",
+  "query": "FYI How many tasks did my team complete today versus plan?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 142,
+  "category": "copilot/team_analysis",
+  "query": "Hi, Spot any FSE whose completion rate dropped compared to last week",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 143,
+  "category": "fse/own_day",
+  "query": "I reached Udupi Grand, starting the onboarding now ?",
+  "party": {
+   "type": "merchant",
+   "id": "M_1901"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 144,
+  "category": "copilot/team_management",
+  "query": "Suggest how to split BTM Layout between Nisha and Lakshmi",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 145,
+  "category": "copilot/team_management",
+  "query": "Pls Team ki is hafte ki performance ka summary do 🙏",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 146,
+  "category": "fse/terse_update",
+  "query": "Boss, visit 1 finished",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 147,
+  "category": "copilot/team_analysis",
+  "query": "Boss, Give me a 3-line summary of how the field team did yesterday",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 148,
+  "category": "copilot/team_management",
+  "query": "FYI Team ki is hafte ki performance ka summary do ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 149,
+  "category": "fse/manager_action",
+  "query": "FYI Push tomorrow's beat plan to Deepa in Malleshwaram ?",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 150,
+  "category": "fse/own_day",
+  "query": "What's on my route for today in Malleshwaram?",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 151,
+  "category": "copilot/team_analysis",
+  "query": "Hi, Which executives haven't logged any visits since Monday?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 152,
+  "category": "copilot/team_analysis",
+  "query": "Rank my FSEs by Soundbox installs this month ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 153,
+  "category": "fse/terse_update",
+  "query": "Boss, 9 complete ✅",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 154,
+  "category": "fse/own_day",
+  "query": "Pls What's on my route for today in Banashankari? pls",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 155,
+  "category": "copilot/team_analysis",
+  "query": "Pls Who on my team has the lowest visit completion this week?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 156,
+  "category": "fse/manager_action",
+  "query": "Pls Push tomorrow's beat plan to Nisha in Yelahanka pls",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 157,
+  "category": "copilot/team_analysis",
+  "query": "Rank my FSEs by Soundbox installs this month",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 158,
+  "category": "fse/terse_update",
+  "query": "Hi, 2 complete ✅ 🙏",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 159,
+  "category": "copilot/team_analysis",
+  "query": "FYI Compare the Yelahanka and Marathahalli teams on onboarding numbers pls",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 160,
+  "category": "fse/own_day",
+  "query": "Boss, How many stops are left on my list?",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 161,
+  "category": "copilot/team_management",
+  "query": "Boss, Weekly review of visits, tickets and collections for my whole team - urgent",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 162,
+  "category": "fse/manager_action",
+  "query": "Pls Add Udupi Grand to Lakshmi's visits for Thursday ok",
+  "party": {
+   "type": "merchant",
+   "id": "M_1658"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 163,
+  "category": "fse/terse_update",
+  "query": "#3 done",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 164,
+  "category": "copilot/team_analysis",
+  "query": "FYI Is the Banashankari team on track for the monthly target? - urgent",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 165,
+  "category": "fse/terse_update",
+  "query": "Hi, 4 ho gaya",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 166,
+  "category": "fse/own_day",
+  "query": "Installed 2 Soundboxes at New Delhi Chaat, update my checklist 🙏",
+  "party": {
+   "type": "merchant",
+   "id": "M_1874"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 167,
+  "category": "copilot/team_management",
+  "query": "FYI Who should I pair with the new joiner for training? pls",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 168,
+  "category": "copilot/team_management",
+  "query": "FYI What should I praise Prakash for in today's stand-up? ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 169,
+  "category": "copilot/team_management",
+  "query": "FYI Team ki is hafte ki performance ka summary do",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 170,
+  "category": "copilot/team_analysis",
+  "query": "Pls Is the Hebbal team on track for the monthly target?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 171,
+  "category": "copilot/team_management",
+  "query": "Hi, What should I praise Kiran for in today's stand-up?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 172,
+  "category": "copilot/team_management",
+  "query": "FYI Who should I pair with the new joiner for training? ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 173,
+  "category": "copilot/team_management",
+  "query": "Pls Suggest how to split Marathahalli between Sowmya and Lakshmi ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 174,
+  "category": "copilot/team_management",
+  "query": "What should I praise Sowmya for in today's stand-up? pls",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 175,
+  "category": "fse/own_day",
+  "query": "Pls QR standee placed at Lucky Footwear, tick it off - urgent",
+  "party": {
+   "type": "merchant",
+   "id": "M_1594"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 176,
+  "category": "fse/terse_update",
+  "query": "completed task number 7 ok",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 177,
+  "category": "copilot/team_analysis",
+  "query": "Give me a 3-line summary of how the field team did yesterday ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 178,
+  "category": "fse/terse_update",
+  "query": "9 complete ✅",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 179,
+  "category": "copilot/team_analysis",
+  "query": "Which executives haven't logged any visits since Monday? ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 180,
+  "category": "copilot/team_analysis",
+  "query": "Hi, Rank my FSEs by Soundbox installs this month ok",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 181,
+  "category": "fse/terse_update",
+  "query": "Boss, 7 complete ✅",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 182,
+  "category": "fse/own_day",
+  "query": "Hi, Kal Hebbal mein kitne visits hain mere?",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 183,
+  "category": "fse/terse_update",
+  "query": "3 complete ✅ ?",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 184,
+  "category": "copilot/team_analysis",
+  "query": "Hi, How many tasks did my team complete today versus plan?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 185,
+  "category": "copilot/team_analysis",
+  "query": "FYI Is Manoj improving or slipping on daily targets? ?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 186,
+  "category": "fse/terse_update",
+  "query": "7 complete ✅ ?",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 187,
+  "category": "fse/terse_update",
+  "query": "Pls task 3 khatam ok",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 188,
+  "category": "fse/own_day",
+  "query": "Pls Which shop should I cover after Tirupati Textiles? ok",
+  "party": {
+   "type": "merchant",
+   "id": "M_1712"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 189,
+  "category": "copilot/team_analysis",
+  "query": "Who on my team has the lowest visit completion this week?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 190,
+  "category": "fse/terse_update",
+  "query": "Pls task 7 khatam",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 191,
+  "category": "copilot/team_analysis",
+  "query": "Is the Hebbal team on track for the monthly target? - urgent",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 192,
+  "category": "fse/manager_action",
+  "query": "Move Manoj's Vinayaka Xerox appointment to next week 🙏",
+  "party": {
+   "type": "merchant",
+   "id": "M_1341"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 193,
+  "category": "fse/terse_update",
+  "query": "kaam 8 poora hua",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 194,
+  "category": "copilot/team_analysis",
+  "query": "Is the Malleshwaram team on track for the monthly target?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 195,
+  "category": "fse/terse_update",
+  "query": "FYI #5 done",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 196,
+  "category": "fse/terse_update",
+  "query": "completed task number 9 🙏",
+  "party": null,
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 197,
+  "category": "copilot/team_management",
+  "query": "Hi, Who should I pair with the new joiner for training?",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 198,
+  "category": "copilot/team_analysis",
+  "query": "Hi, Give me a 3-line summary of how the field team did yesterday",
+  "party": null,
+  "expected": [
+   "copilot"
+  ]
+ },
+ {
+  "id": 199,
+  "category": "fse/own_day",
+  "query": "Vinayaka Xerox was shut when I went, move it to Friday",
+  "party": {
+   "type": "merchant",
+   "id": "M_1844"
+  },
+  "expected": [
+   "fse"
+  ]
+ },
+ {
+  "id": 200,
+  "category": "fse/manager_action",
+  "query": "Hi, Assign the Nandini Milk Parlour Soundbox install to Prakash",
+  "party": {
+   "type": "merchant",
+   "id": "M_1696"
+  },
+  "expected": [
+   "fse"
+  ]
+ }
+]

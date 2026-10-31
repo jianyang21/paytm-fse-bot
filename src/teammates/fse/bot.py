@@ -1,43 +1,38 @@
 """FSE daily-plan WhatsApp bot: Vonage sandbox, native list messages, Sarvam-written text.
 
     python -m teammates.fse.bot           # webhook server (POST /webhook, /status) + IST scheduler
-    python -m teammates.fse.bot morning   # send today's plan right now (or: evening)
+    python -m teammates.fse.bot morning   # debug only: run one job now (morning/reviews/evening/
+                                          # health/collections_brief/collections_preview)
+    python -m teammates.fse.bot web       # server without the scheduler (never sends jobs)
 
 Needs DATABASE_URL (Postgres). REDIS_URL is optional: without it every read goes to Postgres.
 """
 
+import json
 import logging
-import os
 import re
 import sys
 import threading
 import time
 from datetime import date, datetime
 from functools import cache
-from pathlib import Path
 from typing import Any
 
-import redis
 import requests
 from flask import Flask, request
 
-from teammates.config import load_settings, read_env_file
+from teammates.collections import app as collections
+from teammates.fse import tracing
 from teammates.fse.store import IST, REASONS, Store, ist_today
-from teammates.llm.adapters.sarvam import SarvamClient
-from teammates.llm.client import ChatRequest, LLMClient, LLMError, Message
-from teammates.llm.rate_limit import RedisSlidingWindowRateLimiter
+from teammates.fse.tracing import mask, span
+from teammates.llm.client import ChatRequest, LLMError, Message
+from teammates.runtime import MODEL, env, llm, redis_client
 
 log = logging.getLogger(__name__)
-_FILE_ENV = read_env_file(Path(".env"))
 VONAGE_URL = "https://messages-sandbox.nexmo.com/v1/messages"
-MODEL = "sarvam-105b-conversations"  # same as orchestrator planner
 REMINDER = "🪪 Carry your Paytm ID card, Aadhaar and driving licence."
 
 Task = dict[str, Any]
-
-
-def env(key: str, default: str = "") -> str:
-    return os.environ.get(key) or _FILE_ENV.get(key, default)
 
 
 def digits(phone: str) -> str:
@@ -45,45 +40,16 @@ def digits(phone: str) -> str:
 
 
 @cache
-def redis_client() -> redis.Redis | None:
-    url = env("REDIS_URL")
-    if not url:
-        return None
-    return redis.Redis.from_url(url, socket_timeout=2, socket_connect_timeout=2,
-                                health_check_interval=30)
-
-
-@cache
 def store() -> Store:
     s = Store(env("DATABASE_URL"), cache=redis_client())
     s.migrate()
+    tracing.set_sink(s.record_span)
     if phone := digits(env("FSE_PHONE")):
         s.seed_demo(phone)
     return s
 
 
 # --- LLM ---------------------------------------------------------------------------------
-
-
-class _Unlimited:
-    def acquire(self) -> float:
-        return 0.0
-
-
-@cache
-def llm() -> LLMClient:
-    s = load_settings()
-    r = redis_client()
-    try:
-        if r is None:
-            raise redis.ConnectionError("REDIS_URL not set")
-        r.ping()
-        limiter = RedisSlidingWindowRateLimiter(r)
-    except redis.RedisError:
-        # ponytail: one call per FSE per morning; fine unlimited until FSE count grows.
-        log.warning("Redis unreachable; Sarvam calls are not rate limited")
-        limiter = _Unlimited()
-    return SarvamClient(s.sarvam_api_key, limiter, base_url=s.sarvam_base_url)
 
 
 def morning_text(fse: dict[str, Any], tasks: list[Task]) -> str:
@@ -93,35 +59,74 @@ def morning_text(fse: dict[str, Any], tasks: list[Task]) -> str:
         f"Good morning {fse['name']}! {len(tasks)} tasks today in {fse['area']}. "
         f"Start with {first['kind']} at {first['merchant']}."
     )
-    try:
-        text = llm().complete(ChatRequest(model=MODEL, temperature=0.3, messages=[
-            Message(role="system", content=(
-                "You write a short, warm WhatsApp good-morning message for a Paytm field sales "
-                "executive. At most 3 sentences, plain text, no list, no markdown. Say how many "
-                "tasks there are and name the first one as the one to start with.")),
-            Message(role="user", content=(
-                f"FSE: {fse['name']}, area {fse['area']}. Tasks in priority order:\n{lines}")),
-        ])).content.strip()
-    except (LLMError, ValueError) as exc:  # ValueError: SARVAM_API_KEY missing
-        log.warning("LLM failed, using template: %s", exc)
-    return f"{text[:800]}\n\n{REMINDER}"
+    with span("llm.greeting", model=MODEL) as sp:
+        try:
+            text = llm().complete(ChatRequest(model=MODEL, temperature=0.3, messages=[
+                Message(role="system", content=(
+                    "You write a short, warm WhatsApp good-morning message for a Paytm field "
+                    "sales executive. At most 3 sentences, plain text, no list, no markdown. Say "
+                    "how many tasks there are and name the first one as the one to start with.")),
+                Message(role="user", content=(
+                    f"FSE: {fse['name']}, area {fse['area']}. Tasks in priority order:\n{lines}")),
+            ])).content.strip()
+        except (LLMError, ValueError) as exc:  # ValueError: SARVAM_API_KEY missing
+            sp.attrs["fallback"] = "template"  # the FSE still gets the plan, from the template
+            sp.fail(f"LLM failed, template used: {tracing.describe(exc)}")
+    return f"{text[:800]}\n\n📍 First stop: {where(first)}\n\n{REMINDER}"
+
+
+def where(t: Task) -> str:
+    """Merchant, address and a Maps link (when the merchant has coordinates)."""
+    out = f"{t['merchant']}, {t['address']}" if t.get("address") else t["merchant"]
+    if t.get("lat") is not None and t.get("lng") is not None:
+        out += f" https://maps.google.com/?q={t['lat']},{t['lng']}"
+    return out
 
 
 # --- Vonage ------------------------------------------------------------------------------
 
 
 def send(to: str, msg: dict[str, Any]) -> bool:
+    """Vonage send, traced and recorded in message_log (ok, HTTP status, error, message_uuid)."""
+    kind = msg.get("custom", {}).get("interactive", {}).get("type") or msg["message_type"]
+    with span("vonage.send", kind=kind) as sp:
+        ok, status, error, uuid = deliver(to, msg)
+        sp.attrs.update(http_status=status, message_uuid=uuid)
+        if not ok:
+            sp.fail(f"Vonage rejected {kind}: {error}")
+        try:
+            store().log_message("out", to, kind, message_text(msg), ok, http_status=status,
+                                error=error, message_uuid=uuid)
+        except Exception as exc:  # the log must never block a send
+            log.warning("message_log write failed: %s", exc)
+    return ok
+
+
+def deliver(to: str, msg: dict[str, Any]) -> tuple[bool, int | None, str | None, str | None]:
+    """POST to Vonage -> (ok, http_status, error, message_uuid)."""
     payload = {"from": env("VONAGE_WHATSAPP_FROM", "14157386102"), "to": to,
                "channel": "whatsapp", **msg}
     auth = (env("VONAGE_API_KEY"), env("VONAGE_API_SECRET"))
     try:
         r = requests.post(VONAGE_URL, json=payload, auth=auth, timeout=15)
     except requests.RequestException as exc:
-        log.error("vonage send failed: %s", exc)
-        return False
+        return False, None, tracing.describe(exc), None
     if not r.ok:
-        log.error("vonage %s HTTP %s: %s", msg["message_type"], r.status_code, r.text[:300])
-    return r.ok
+        return False, r.status_code, r.text[:500], None
+    try:
+        uuid = r.json().get("message_uuid")
+    except ValueError:
+        uuid = None
+    return True, r.status_code, None, uuid
+
+
+def message_text(msg: dict[str, Any]) -> str:
+    if msg["message_type"] == "text":
+        return msg["text"]
+    inter = msg.get("custom", {}).get("interactive", {})
+    rows = [r["title"] for sec in inter.get("action", {}).get("sections", [])
+            for r in sec.get("rows", [])]
+    return f"{inter.get('body', {}).get('text', '')}\n[{' | '.join(rows)}]"
 
 
 def send_text(to: str, text: str) -> bool:
@@ -155,7 +160,8 @@ def send_checklist(to: str, body: str, tasks: list[Task]) -> None:
         send_text(to, body)
         return
     rows = [{"id": f"done:{t['day']}:{t['id']}", "title": t["merchant"][:24],
-             "description": t["kind"][:72]} for t in open_tasks[:10]]  # WhatsApp list limit
+             "description": " · ".join(filter(None, (t["kind"], t.get("address"))))[:72]}
+            for t in open_tasks[:10]]  # WhatsApp list limit
     if send_list(to, body, "📋 View tasks", "Tap a task when done", rows):
         return
     numbered = "\n".join(
@@ -167,26 +173,104 @@ def send_checklist(to: str, body: str, tasks: list[Task]) -> None:
 # --- Jobs and inbound --------------------------------------------------------------------
 
 
+def for_each_fse(fn: Any) -> None:
+    """Run fn(fse) for every FSE in its own span. One FSE failing is recorded (with the root
+    cause) and the job carries on with the rest instead of stopping."""
+    fses = store().fses()
+    if root := tracing.current():
+        root.attrs["fses"] = len(fses)
+    for fse in fses:
+        try:
+            with span("fse", fse_id=fse["id"]):
+                fn(fse)
+        except Exception:
+            log.exception("FSE %s failed in %s", fse["id"], root.name if root else "job")
+
+
 def send_morning() -> None:
     store().ensure_partitions()  # creates next month's partitions well before they're needed
-    for fse in store().fses():
+
+    def one(fse: dict[str, Any]) -> None:
         tasks = store().plan(fse["id"])
+        if not tasks:
+            send_text(fse["phone"], f"Good morning {fse['name']}! No open projects in "
+                                    f"{fse['area']} today.")
+            return
         send_checklist(fse["phone"], morning_text(fse, tasks), tasks)
+
+    for_each_fse(one)
+
+
+def ask_review(to: str, fse_id: int, day: date) -> None:
+    """Ask what the customer said for the next done task; thank once all are answered."""
+    if r := store().request_review(fse_id, day):
+        send_text(to, f"⭐ What did {r['merchant']} say about today's visit? "
+                      "Reply with text or a voice note.")
+    else:
+        send_text(to, "🙏 Thanks, all customer reviews saved.")
+
+
+def send_reviews() -> None:
+    """6:30 pm: collect a customer review for each task done today, one at a time."""
+    def one(fse: dict[str, Any]) -> None:
+        if any(t["status"] == "done" for t in store().plan(fse["id"])):
+            ask_review(fse["phone"], fse["id"], ist_today())
+
+    for_each_fse(one)
 
 
 def send_evening() -> None:
-    for fse in store().fses():
-        ask_why(fse["phone"], store().plan(fse["id"]))
+    """8 pm: close the review window, then ask why for each task not done."""
+    def one(fse: dict[str, Any]) -> None:
+        store().drop_unanswered_reviews(fse["id"], ist_today())
+        if tasks := store().plan(fse["id"]):
+            ask_why(fse["phone"], tasks)
+
+    for_each_fse(one)
+
+
+def send_health() -> None:
+    """22:00: did every job run, how late, what failed and why. Alerts ALERT_PHONE if not ok."""
+    report = store().health(ist_today(), [name for name, *_ in JOBS if name != "health"])
+    if root := tracing.current():
+        root.attrs.update(ok=report["ok"], problems=len(report["problems"]))
+    log.info("health %s", json.dumps(report, default=str))
+    if not report["ok"] and (to := digits(env("ALERT_PHONE"))):
+        lines = "\n".join(f"• {p}" for p in report["problems"][:10])
+        send_text(to, f"⚠️ FSE bot health {report['day']}: {len(report['problems'])} "
+                      f"problem(s)\n{lines}")
 
 
 def handle_inbound(m: dict[str, Any]) -> None:
     sender = digits(str(m.get("from", "")))
-    fse = store().fse_by_phone(sender)
-    if fse is None:  # public webhook: only known FSEs get answers
-        log.warning("ignoring message from unknown number")
-        return
+    kind = str(m.get("message_type") or "")
+    with span("inbound", kind=kind) as sp:
+        fse = store().fse_by_phone(sender)
+        body = (m.get("text") or (m.get("reply") or {}).get("id")
+                or (m.get("audio") or {}).get("url"))
+        store().log_message("in", sender, kind, body, fse is not None,
+                            fse_id=fse["id"] if fse else None)
+        if fse is None:  # public webhook: only known FSEs get answers
+            sp.attrs.update(rejected="unregistered sender", sender=mask(sender))
+            log.warning("ignoring message from unknown number %s", mask(sender))
+            return
+        sp.fse_id = fse["id"]
+        sp.attrs["action"] = _handle(m, sender, fse, kind)
+
+
+def _handle(m: dict[str, Any], sender: str, fse: dict[str, Any], kind: str) -> str:
+    """Route one message from a registered FSE; returns which branch handled it (traced)."""
     s, fse_id = store(), fse["id"]
-    kind = m.get("message_type")
+    if kind == "location":  # FSE shared their location: the fse table is updated, cache dropped
+        loc = m.get("location") or {}
+        try:
+            lat, lng = float(loc["lat"]), float(loc.get("long", loc.get("lng")))
+            s.set_fse_location(fse_id, lat, lng, loc.get("address") or loc.get("name"))
+        except (KeyError, TypeError, ValueError):
+            send_text(sender, "⚠️ Couldn't read that location. Please share it again.")
+            return "location:unreadable"
+        send_text(sender, "📍 Location saved.")
+        return "location"
     reply = m.get("reply") or {}
     text = str(m.get("text") or "").strip()
     audio = (m.get("audio") or {}).get("url")
@@ -210,22 +294,33 @@ def handle_inbound(m: dict[str, Any]) -> None:
             send_checklist(sender, f"✅ {merchant} done. {left} left.", tasks)
         else:
             send_text(sender, f"🎉 All {len(tasks)} tasks done today. Great work!")
+        return "done"
     elif action == "why" and code in REASONS and s.set_reason(fse_id, day, task_id, code):
         if code == "other":
             merchant = next((t["merchant"] for t in tasks if t["id"] == task_id), "this task")
             send_text(sender, f"✍️ Type why {merchant} wasn't done.")
         else:
             ask_why(sender, s.plan(fse_id))
+        return f"reason:{code}"
     elif kind != "reply" and (text or audio) and pending:
         s.set_reason(fse_id, date.fromisoformat(pending["day"]), pending["id"], "other",
                      text or audio)
         ask_why(sender, s.plan(fse_id))
+        return "reason:other:text"
+    elif kind != "reply" and (text or audio) and (
+            review := s.pending_review(fse_id, ist_today())):
+        s.save_review(fse_id, date.fromisoformat(review["day"]), review["id"],
+                      text or None, audio)
+        ask_review(sender, fse_id, ist_today())
+        return "review"
     else:
         s.add_feedback(fse_id, text or reply.get("title"), audio)
         send_text(sender, "📝 Noted, thanks!")
+        return "feedback"
 
 
 app = Flask(__name__)
+app.register_blueprint(collections.bp)  # collections manager inbox
 
 
 @app.get("/")
@@ -245,31 +340,92 @@ def webhook() -> tuple[str, int]:
 @app.post("/status")
 def status() -> tuple[str, int]:
     d = request.get_json(silent=True) or {}
-    log.info("status %s %s %s", d.get("message_uuid"), d.get("status"), d.get("error") or "")
+    try:
+        record_status(d)
+    except Exception:
+        log.exception("status callback failed")
     return "", 200
 
 
-JOBS = {"08:30": send_morning, "18:30": send_evening}
+FAILED_DELIVERY = {"rejected", "undeliverable", "failed"}
+
+
+def record_status(d: dict[str, Any]) -> None:
+    """Vonage delivery callback -> message_log; a failed delivery becomes an error span in the
+    trace that sent the message, so it shows up in v_root_causes with Vonage's reason."""
+    status, uuid = str(d.get("status") or ""), str(d.get("message_uuid") or "")
+    err = d.get("error") or {}
+    error = (" - ".join(str(err.get(k)) for k in ("title", "detail") if err.get(k))
+             if isinstance(err, dict) else str(err)) or None
+    row = store().record_delivery(uuid, status, error) if uuid else None
+    log.info("status %s %s %s", uuid, status, error or "")
+    if status in FAILED_DELIVERY:
+        with span("vonage.delivery", fse_id=row["fse_id"] if row else None,
+                  trace_id=row["trace_id"] if row else None,
+                  status=status, message_uuid=uuid, kind=row["kind"] if row else None) as sp:
+            sp.fail(f"WhatsApp {status}: {error or 'no reason given'}")
+
+
+# (name, window start, window end) in IST. A job runs once per day, at the first tick inside
+# its window: on time when the bot is awake, or as soon as it wakes/restarts (catch-up).
+JOBS = [
+    ("morning", "08:30", "12:00"),
+    ("reviews", "18:30", "20:00"),
+    ("evening", "20:00", "22:00"),
+    ("collections_brief", "09:00", "12:00"),  # collections manager's portfolio email
+    ("health", "22:00", "23:59"),  # did the day run properly; alerts ALERT_PHONE if not
+]
+_claimed: set[tuple[str, date]] = set()  # saves a DB round trip per tick once a job is taken
+
+
+def job_fn(name: str) -> Any:
+    return {"morning": send_morning, "reviews": send_reviews, "evening": send_evening,
+            "collections_brief": collections.send_brief,
+            "collections_preview": collections.preview_brief, "health": send_health}[name]
+
+
+def run_due_jobs(now: datetime) -> None:
+    """Run every job whose window contains `now` and that nobody has run today.
+    The claim is a row in job_run, so restarts, deploys and extra instances never double-send."""
+    hhmm, day = now.strftime("%H:%M"), now.date()
+    for name, start, end in JOBS:
+        if not start <= hhmm < end or (name, day) in _claimed:
+            continue
+        if store().claim_job(name, day):
+            log.info("job %s started", name)
+            late = (now.hour * 60 + now.minute) - (int(start[:2]) * 60 + int(start[3:]))
+            # ponytail: claimed before running, so a crash mid-job isn't retried that day;
+            # per-FSE send tracking would make it resumable.
+            try:
+                with span(f"job.{name}", minutes_late=late, window=f"{start}-{end}"):
+                    job_fn(name)()
+            except Exception:
+                log.exception("job %s failed", name)
+        _claimed.add((name, day))
 
 
 def scheduler() -> None:
-    last = ""
     while True:
-        now = datetime.now(IST).strftime("%H:%M")
-        if now != last and now in JOBS:
-            try:
-                JOBS[now]()
-            except Exception:
-                log.exception("job %s failed", now)
-        last = now
+        try:
+            run_due_jobs(datetime.now(IST))
+        except Exception:  # e.g. DB unreachable: try again next tick
+            log.exception("scheduler tick failed")
         time.sleep(20)
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     store()  # fail fast: migrate + seed before taking traffic
-    if job := {"morning": send_morning, "evening": send_evening}.get(" ".join(sys.argv[1:])):
-        job()
+    collections.loan_store()
+    if sys.argv[1:] == ["web"]:  # dashboard + webhooks only, no scheduler: safe any time
+        app.run(host="0.0.0.0", port=int(env("PORT", "5000")))
+        return
+    if args := sys.argv[1:]:  # manual override for debugging only; production runs on its own
+        try:
+            job_fn(args[0])()
+        finally:  # unclosed pools make interpreter exit wait 5 s per pool thread
+            store().pool.close()
+            collections.loan_store().pool.close()
         return
     threading.Thread(target=scheduler, daemon=True).start()
     app.run(host="0.0.0.0", port=int(env("PORT", "5000")))

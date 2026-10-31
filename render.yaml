@@ -17,7 +17,18 @@ services:
         sync: false
       - key: FSE_PHONE
         sync: false
+      - key: ALERT_PHONE
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: REDIS_URL
+        sync: false
+      # Collections manager: 9 am brief email + /collections approval inbox
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MANAGER_EMAIL
+        sync: false
+      - key: MANAGER_TOKEN
+        sync: false
+      - key: BRIEF_FROM
         sync: false

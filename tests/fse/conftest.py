@@ -8,6 +8,7 @@ import pytest
 from psycopg import sql
 
 from teammates.config import read_env_file
+from teammates.fse import tracing
 from teammates.fse.store import Store
 
 PHONE = "919999900000"
@@ -26,8 +27,10 @@ def store():
     try:
         s.migrate()
         s.seed_demo(PHONE)
+        tracing.set_sink(s.record_span)
         yield s
     finally:
+        tracing.set_sink(None)
         s.pool.close()
         with psycopg.connect(DSN, autocommit=True) as admin:
             admin.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))

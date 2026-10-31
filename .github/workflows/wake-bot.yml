@@ -7,8 +7,10 @@ on:
   schedule:
     - cron: "55 2,12 * * *"    # 08:25 IST (morning 08:30), 18:25 IST (reviews 18:30)
     - cron: "10,30 3,13 * * *" # 08:40, 09:00 / 18:40, 19:00 IST: catch-up
+    - cron: "35 3 * * *"       # 09:05 IST: collections brief (09:00) if the 09:00 ping ran late
     - cron: "25,40 14 * * *"   # 19:55 IST (evening 20:00), 20:10 IST: catch-up
     - cron: "0 15 * * *"       # 20:30 IST: catch-up
+    - cron: "35,55 16 * * *"   # 22:05 IST (health check 22:00), 22:25 IST: catch-up
   workflow_dispatch: {}
 jobs:
   ping:
