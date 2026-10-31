@@ -32,3 +32,12 @@ services:
         sync: false
       - key: BRIEF_FROM
         sync: false
+      # Support desk: /support review queue logins
+      - key: SUPPORT_KAM_EMAIL
+        sync: false
+      - key: SUPPORT_KAM_TOKEN
+        sync: false
+      - key: SUPPORT_AGENT_EMAIL
+        sync: false
+      - key: SUPPORT_AGENT_TOKEN
+        sync: false

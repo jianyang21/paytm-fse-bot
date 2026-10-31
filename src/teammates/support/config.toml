@@ -1,0 +1,79 @@
+# Support desk: every rating, band, cutoff and cost lives here, nowhere else in code.
+#
+# RISK SCORING (T22). Likelihood x Impact, the standard risk model. Each factor is rated 0-9
+# (OWASP Risk Rating style) and the factors are averaged per side; the scale below is fixed and
+# documented so the same ticket always gets the same score (NIST SP 800-30 spirit).
+#   score = avg(likelihood) * avg(impact) / 81 * 100            (0..100)
+# Likelihood = is something wrong with the account? Impact = how bad if we get it wrong?
+# FAQ-answerable tickets have impact 0, so score 0. Non-FAQ tickets have a likelihood floor of
+# 1 (and an impact floor of 1), so their score is never 0.
+
+[likelihood]
+two_fa = { on = 0, off = 8 }
+sim_change = { none = 0, recent = 7 }
+sim_change_recent_days = 14            # a SIM/device change within this many days is "recent"
+failed_logins_window_days = 7          # rolling 7 x 24 h back from now, not a calendar week
+# [at least N failed attempts in the window, rating]; the last matching row wins
+failed_logins = [[0, 0], [1, 3], [3, 6], [5, 8]]
+blocked_now = 9                        # blocked from the account right now (+ security flag)
+past_fraud = { none = 0, resolved = 5, confirmed = 9 }
+identity = { yes = 0, partial = 5, no = 9 }
+floor = 1                              # non-FAQ tickets: avg likelihood never below this
+
+[impact]
+amount = { none = 0, low = 2, mid = 5, high = 9 }
+amount_low_below = 1000                # amount < 1000 -> low
+amount_high_above = 5000               # 1000..5000 -> mid, > 5000 -> high
+type = { faq = 0, status = 4, refund = 4, dispute = 8 }
+floor = 1                              # not FAQ-answerable: avg impact never below this
+
+[score]
+# Lower bound of each band; the highest bound <= score wins.
+bands = [[0, "low"], [10, "medium"], [25, "high"]]
+
+[overrides]
+# Any of these sends the ticket to a human, whatever the score.
+dispute_amount_above = 5000            # dispute/chargeback over this amount
+money_moving_types = ["refund", "dispute"]   # + identity "no" -> human
+# Blocked-from-account-now as an override. PRODUCT OWNER HAS NOT CONFIRMED: default true.
+override_blocked_now = true
+# Classifier unsure (or the LLM failed and the keyword fallback ran): a human checks it.
+min_classify_confidence = 0.6
+# confirmed fraud, injection flag and an unverified sender always override (not configurable)
+
+[threshold]
+# Escalate when P(risky | score) >= c_review / (c_review + c_miss)   (Elkan 2001)
+c_review = 1.0       # reviewer time per ticket (relative cost units)
+c_miss = 9.0         # auto-resolving a ticket that was risky. Misses cost more -> low cutoff.
+bin_width = 5        # score bins for calibrating score -> probability on the labeled seed
+target_recall = 0.95 # the sweep marks the cheapest threshold that still catches this share
+fallback_score = 15  # used only if the labeled seed set can't be read
+
+[faq]
+min_confidence = 0.35  # retrieval cosine; below this the FAQ is not used as the answer
+context_min = 0.15     # a weaker match may still go into a draft as background
+
+[intake]
+# A message is a repeat contact on an open ticket if it quotes the ticket number ("#123"), or
+# comes from the same contact within this many minutes of that ticket's last message.
+repeat_window_minutes = 30
+
+[cache]
+profile_ttl_s = 1800   # user details (name, tier, language, contacts)
+security_ttl_s = 120   # 2FA, SIM, failed logins, fraud, identity: sensitive, short-lived
+txns_ttl_s = 120       # settlement/transaction status
+
+[llm]
+model = "sarvam-105b-conversations"
+prompt_version = "support-v1"
+workers = 8            # tickets handled at the same time
+ab_models = ["sarvam-105b-conversations", "sarvam-m"]
+
+# Price per 1,000 tokens in INR. ASSUMED placeholder values: replace with the contract price.
+[llm.prices.sarvam-105b-conversations]
+input = 0.30
+output = 0.90
+
+[llm.prices.sarvam-m]
+input = 0.10
+output = 0.30

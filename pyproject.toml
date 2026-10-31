@@ -16,7 +16,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-teammates = ["fse/*.sql", "collections/*.sql"]
+teammates = ["fse/*.sql", "collections/*.sql", "support/*.sql", "support/*.toml", "support/*.json"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]

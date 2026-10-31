@@ -2,7 +2,8 @@
 
     python -m teammates.fse.bot           # webhook server (POST /webhook, /status) + IST scheduler
     python -m teammates.fse.bot morning   # debug only: run one job now (morning/reviews/evening/
-                                          # health/collections_brief/collections_preview)
+                                          # health/collections_brief/collections_preview/
+                                          # kam_digest/kam_preview)
     python -m teammates.fse.bot web       # server without the scheduler (never sends jobs)
 
 Needs DATABASE_URL (Postgres). REDIS_URL is optional: without it every read goes to Postgres.
@@ -25,8 +26,11 @@ from teammates.collections import app as collections
 from teammates.fse import tracing
 from teammates.fse.store import IST, REASONS, Store, ist_today
 from teammates.fse.tracing import mask, span
+from teammates.kam import app as kam
+from teammates.kam.digest import config as kam_config
 from teammates.llm.client import ChatRequest, LLMError, Message
 from teammates.runtime import MODEL, env, llm, redis_client
+from teammates.support import app as support
 
 log = logging.getLogger(__name__)
 VONAGE_URL = "https://messages-sandbox.nexmo.com/v1/messages"
@@ -321,6 +325,8 @@ def _handle(m: dict[str, Any], sender: str, fse: dict[str, Any], kind: str) -> s
 
 app = Flask(__name__)
 app.register_blueprint(collections.bp)  # collections manager inbox
+app.register_blueprint(support.bp)  # support desk: review queue + intake
+app.register_blueprint(kam.bp)  # KAM: today's digest view
 
 
 @app.get("/")
@@ -366,34 +372,39 @@ def record_status(d: dict[str, Any]) -> None:
             sp.fail(f"WhatsApp {status}: {error or 'no reason given'}")
 
 
-# (name, window start, window end) in IST. A job runs once per day, at the first tick inside
-# its window: on time when the bot is awake, or as soon as it wakes/restarts (catch-up).
+# (name, window start, window end) in IST, or in JOB_TZ[name]. A job runs once per day, at
+# the first tick inside its window: on time when the bot is awake, or as soon as it
+# wakes/restarts (catch-up).
 JOBS = [
     ("morning", "08:30", "12:00"),
     ("reviews", "18:30", "20:00"),
     ("evening", "20:00", "22:00"),
     ("collections_brief", "09:00", "12:00"),  # collections manager's portfolio email
+    ("kam_digest", kam_config().time, kam_config().window_end),  # KAM's key-account email
     ("health", "22:00", "23:59"),  # did the day run properly; alerts ALERT_PHONE if not
 ]
+JOB_TZ = {"kam_digest": kam_config().tz}  # jobs scheduled in their own configured timezone
 _claimed: set[tuple[str, date]] = set()  # saves a DB round trip per tick once a job is taken
 
 
 def job_fn(name: str) -> Any:
     return {"morning": send_morning, "reviews": send_reviews, "evening": send_evening,
             "collections_brief": collections.send_brief,
-            "collections_preview": collections.preview_brief, "health": send_health}[name]
+            "collections_preview": collections.preview_brief, "kam_digest": kam.send_digest,
+            "kam_preview": kam.preview_digest, "health": send_health}[name]
 
 
 def run_due_jobs(now: datetime) -> None:
     """Run every job whose window contains `now` and that nobody has run today.
     The claim is a row in job_run, so restarts, deploys and extra instances never double-send."""
-    hhmm, day = now.strftime("%H:%M"), now.date()
     for name, start, end in JOBS:
+        local = now.astimezone(JOB_TZ.get(name, IST))
+        hhmm, day = local.strftime("%H:%M"), local.date()
         if not start <= hhmm < end or (name, day) in _claimed:
             continue
         if store().claim_job(name, day):
             log.info("job %s started", name)
-            late = (now.hour * 60 + now.minute) - (int(start[:2]) * 60 + int(start[3:]))
+            late = (local.hour * 60 + local.minute) - (int(start[:2]) * 60 + int(start[3:]))
             # ponytail: claimed before running, so a crash mid-job isn't retried that day;
             # per-FSE send tracking would make it resumable.
             try:
