@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: fse-bot
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m teammates.fse.bot
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.3
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: VONAGE_API_KEY
+        sync: false
+      - key: VONAGE_API_SECRET
+        sync: false
+      - key: FSE_PHONE
+        sync: false
