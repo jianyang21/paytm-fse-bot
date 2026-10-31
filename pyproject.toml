@@ -3,7 +3,8 @@ name = "paytm-teammates"
 version = "0.1.0"
 description = "Autonomous AI Teammates (Paytm hackathon, Track 3)"
 requires-python = ">=3.11"
-dependencies = ["pydantic>=2", "redis>=5", "flask>=3", "requests>=2.31", "psycopg[binary,pool]>=3.2"]
+dependencies = ["pydantic>=2", "redis>=5", "flask>=3", "requests>=2.31", "psycopg[binary,pool]>=3.2",
+                "waitress>=3"]
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "fakeredis[lua]>=2.20"]

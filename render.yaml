@@ -15,6 +15,9 @@ services:
         sync: false
       - key: VONAGE_API_SECRET
         sync: false
+      # Vonage dashboard > Settings > signature secret: signed WhatsApp from merchants -> support
+      - key: VONAGE_SIGNATURE_SECRET
+        sync: false
       - key: FSE_PHONE
         sync: false
       - key: ALERT_PHONE

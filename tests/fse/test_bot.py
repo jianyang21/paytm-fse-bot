@@ -196,3 +196,44 @@ def test_kam_digest_fires_at_nine_in_its_configured_timezone(monkeypatch):
             clock.append(datetime(2026, 11, day, hh, mm, tzinfo=ZoneInfo(tz)).astimezone(UTC))
             bot.run_due_jobs(clock[-1])  # the bot's clock may be in any zone
         assert [r.astimezone(ZoneInfo(tz)).strftime("%H:%M") for r in ran] == ["09:00"], tz
+
+
+def _jwt(secret, body, iat):
+    import base64
+    import hashlib
+    import hmac
+    import json
+    enc = lambda d: base64.urlsafe_b64encode(json.dumps(d).encode()).rstrip(b"=").decode()  # noqa: E731
+    head = enc({"alg": "HS256", "typ": "JWT"})
+    claims = enc({"iat": iat, "payload_hash": hashlib.sha256(body).hexdigest()})
+    sig = hmac.new(secret.encode(), f"{head}.{claims}".encode(), "sha256").digest()
+    return f"{head}.{claims}.{base64.urlsafe_b64encode(sig).rstrip(b'=').decode()}"
+
+
+def test_vonage_signature(monkeypatch):
+    import time
+    monkeypatch.setenv("VONAGE_SIGNATURE_SECRET", "s3cret")
+    body = b'{"from": "919999999999", "text": "refund?"}'
+
+    def signed(token, data=body):
+        with bot.app.test_request_context("/webhook", method="POST", data=data,
+                                          headers={"Authorization": f"Bearer {token}"}):
+            return bot.vonage_signed(bot.request)
+
+    assert signed(_jwt("s3cret", body, time.time()))
+    assert not signed(_jwt("wrong", body, time.time()))
+    assert not signed(_jwt("s3cret", body, time.time()), data=body + b" ")  # body tampered
+    assert not signed(_jwt("s3cret", body, time.time() - 3600))  # replayed
+    assert not signed("garbage")
+
+
+def test_signed_stranger_text_goes_to_support_desk(sent, monkeypatch):
+    got = []
+    monkeypatch.setattr(bot, "to_support", lambda sender, m: got.append((sender, m["text"])))
+    bot.handle_inbound({"from": "910000000000", "message_type": "text", "text": "refund?"},
+                       signed=True)
+    bot.handle_inbound({"from": "910000000000", "message_type": "text", "text": "x"})  # unsigned
+    bot.handle_inbound({"from": PHONE, "message_type": "text", "text": "Ravi wants 2"},
+                       signed=True)  # FSE still gets the FSE bot
+    assert got == [("910000000000", "refund?")]
+    assert sent[-1]["text"] == "📝 Noted, thanks!"

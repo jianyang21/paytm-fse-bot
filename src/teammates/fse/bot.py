@@ -9,18 +9,23 @@
 Needs DATABASE_URL (Postgres). REDIS_URL is optional: without it every read goes to Postgres.
 """
 
+import base64
+import hashlib
+import hmac
 import json
 import logging
 import re
 import sys
 import threading
 import time
-from datetime import date, datetime
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, date, datetime
 from functools import cache
 from typing import Any
 
 import requests
-from flask import Flask, request
+from flask import Flask, Request, request
+from waitress import serve
 
 from teammates.collections import app as collections
 from teammates.fse import tracing
@@ -245,7 +250,45 @@ def send_health() -> None:
                       f"problem(s)\n{lines}")
 
 
-def handle_inbound(m: dict[str, Any]) -> None:
+# ponytail: one worker keeps a merchant's messages in order; a real queue if volume grows.
+_support_pool = ThreadPoolExecutor(1, thread_name_prefix="support")
+
+
+def _b64(x: str) -> bytes:
+    return base64.urlsafe_b64decode(x + "=" * (-len(x) % 4))
+
+
+def vonage_signed(req: Request) -> bool:
+    """Vonage signs webhooks with an HS256 JWT (VONAGE_SIGNATURE_SECRET) whose payload_hash is
+    the body's SHA-256. Without the secret nothing counts as signed."""
+    secret, auth = env("VONAGE_SIGNATURE_SECRET"), req.headers.get("Authorization", "")
+    if not secret or not auth.startswith("Bearer "):
+        return False
+    try:
+        head, body, sig = auth[7:].split(".")
+        mac = hmac.new(secret.encode(), f"{head}.{body}".encode(), "sha256").digest()
+        claims = json.loads(_b64(body))
+        return (hmac.compare_digest(_b64(sig), mac)
+                and claims.get("payload_hash") == hashlib.sha256(req.get_data()).hexdigest()
+                and abs(time.time() - float(claims.get("iat", 0))) < 300)
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
+def to_support(sender: str, m: dict[str, Any]) -> None:
+    payload = {"from": sender, "text": str(m.get("text") or ""),
+               "timestamp": m.get("timestamp") or datetime.now(UTC).isoformat()}
+
+    def run() -> None:
+        try:
+            support.desk().handle("whatsapp", payload)
+        except Exception:
+            log.exception("support ticket from %s failed", mask(sender))
+
+    _support_pool.submit(run)
+
+
+def handle_inbound(m: dict[str, Any], signed: bool = False) -> None:
     sender = digits(str(m.get("from", "")))
     kind = str(m.get("message_type") or "")
     with span("inbound", kind=kind) as sp:
@@ -254,7 +297,11 @@ def handle_inbound(m: dict[str, Any]) -> None:
                 or (m.get("audio") or {}).get("url"))
         store().log_message("in", sender, kind, body, fse is not None,
                             fse_id=fse["id"] if fse else None)
-        if fse is None:  # public webhook: only known FSEs get answers
+        if fse is None and signed and kind == "text":  # a merchant: the support desk answers
+            sp.attrs.update(routed="support", sender=mask(sender))
+            to_support(sender, m)
+            return
+        if fse is None:  # unsigned or non-text: only known FSEs get answers
             sp.attrs.update(rejected="unregistered sender", sender=mask(sender))
             log.warning("ignoring message from unknown number %s", mask(sender))
             return
@@ -337,7 +384,7 @@ def health() -> str:
 @app.post("/webhook")
 def webhook() -> tuple[str, int]:
     try:
-        handle_inbound(request.get_json(silent=True) or {})
+        handle_inbound(request.get_json(silent=True) or {}, signed=vonage_signed(request))
     except Exception:  # always 200: a Vonage retry would replay the message
         log.exception("inbound failed")
     return "", 200
@@ -428,8 +475,10 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     store()  # fail fast: migrate + seed before taking traffic
     collections.loan_store()
+    support.desk()
+    port = int(env("PORT", "5000"))
     if sys.argv[1:] == ["web"]:  # dashboard + webhooks only, no scheduler: safe any time
-        app.run(host="0.0.0.0", port=int(env("PORT", "5000")))
+        serve(app, host="0.0.0.0", port=port, threads=8)
         return
     if args := sys.argv[1:]:  # manual override for debugging only; production runs on its own
         try:
@@ -439,7 +488,7 @@ def main() -> None:
             collections.loan_store().pool.close()
         return
     threading.Thread(target=scheduler, daemon=True).start()
-    app.run(host="0.0.0.0", port=int(env("PORT", "5000")))
+    serve(app, host="0.0.0.0", port=port, threads=8)
 
 
 if __name__ == "__main__":
