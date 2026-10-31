@@ -1,0 +1,78 @@
+# Support desk eval: the labeled seed tickets and the attack suite through the real Desk
+# (intake, guard, classify, FAQ, tools, cache, risk, threshold, draft, review, audit, tracing),
+# plus the support unit tests. Offline by default (fake LLM, in-memory store): no secrets needed.
+# Runs every day at 06:20 IST, or by hand:
+#   gh workflow run support-eval.yml               # offline
+#   gh workflow run support-eval.yml -f live=true  # real Sarvam calls (repo secret SARVAM_API_KEY)
+# Results: the run's summary page (every metric, pass/fail, failure details, reviewer rates per
+# band, latency, cost) + the "support-eval-report" artifact. A failed metric fails the run.
+name: support-eval
+on:
+  schedule:
+    - cron: "50 0 * * *" # 06:20 IST (UTC + 5:30)
+  workflow_dispatch:
+    inputs:
+      live:
+        description: "Call the real LLM (costs tokens)"
+        type: boolean
+        default: false
+jobs:
+  support-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LIVE: ${{ inputs.live && '--live' || '' }}
+      SARVAM_API_KEY: ${{ inputs.live && secrets.SARVAM_API_KEY || '' }}
+      OUT: reports/support_eval/latest.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install ".[dev]"
+      - name: Unit tests
+        run: python -m pytest -q tests/support tests/test_guard.py
+      - name: Run eval
+        run: |
+          if [ -n "$LIVE" ]; then
+            test -n "$SARVAM_API_KEY" || { echo "Set the repo secret SARVAM_API_KEY"; exit 1; }
+          fi
+          python -m teammates.support.evals $LIVE --out "$OUT"
+      - name: Summary
+        if: always()
+        run: |
+          python - <<'EOF'
+          import json, os
+          path = os.environ["OUT"]
+          if not os.path.exists(path):
+              raise SystemExit("no report: the eval crashed before finishing, see the step above")
+          r = json.load(open(path, encoding="utf-8"))
+          cell = lambda s: str(s).replace("|", "\\|").replace("\n", " ")
+          md = [f"## Support desk eval: {'✅ all passed' if r['passed'] else '❌ failed'}", "",
+                f"{r['tickets']} labeled tickets + {r['attacks']} attacks, LLM: {r['llm']}, "
+                f"run at {r['run_at']}", "",
+                "| Metric | Score | Threshold | Checks |", "|---|---|---|---|"]
+          for name, m in r["metrics"].items():
+              mark = "✅" if m["passed"] else "❌"
+              md.append(f"| {name} | {mark} {m['score']:.3f} | {m['threshold']} | {m['checks']} |")
+          info = dict(r["info"])
+          bands = info.pop("reviewer_rates_per_band")
+          md += ["", "### Reviewer actions per risk band", "",
+                 "| Band | Reviewed | Approve | Edit | Reject |", "|---|---|---|---|---|"]
+          md += [f"| {b} | {x['n']} | {x['approve_rate']:.0%} | {x['edit_rate']:.0%} "
+                 f"| {x['reject_rate']:.0%} |" for b, x in bands.items()]
+          md += ["", "### Latency, cost, cache", "", "| | |", "|---|---|"]
+          md += [f"| {k} | {v} |" for k, v in info.items()]
+          for name, m in r["metrics"].items():
+              if m["failures"]:
+                  md += ["", f"### {name}: what failed", ""]
+                  md += [f"- {cell(f)}" for f in m["failures"]]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
+              f.write("\n".join(md) + "\n")
+          EOF
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: support-eval-report
+          path: reports/support_eval

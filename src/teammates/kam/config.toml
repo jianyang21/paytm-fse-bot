@@ -1,0 +1,44 @@
+# KAM daily digest: every schedule, limit, TTL, source and model setting lives here.
+
+[schedule]
+time = "09:00"              # local time in `timezone`
+window_end = "12:00"        # a bot that wakes after this skips the day (no stale digest)
+timezone = "Asia/Kolkata"
+
+[digest]
+lookback_hours = 24          # AI-resolved tickets since the previous digest
+competitor_lookback_days = 7
+max_items = 25               # per section; the rest is "N more in the dashboard"
+tool_attempts = 2            # a tool that times out is retried once, then reported
+send_attempts = 3            # a failed send is retried twice, then recorded as failed
+retry_backoff_s = 2.0        # linear: 2 s, 4 s, ...
+
+[cache]  # seconds. Freshness within one run: a preview at 08:55 and the 09:00 send share it.
+accounts_ttl_s = 3600        # key-account assignment
+account_ttl_s = 900          # one account's transactions + friction signal
+queries_ttl_s = 300          # ticket queue (changes during the day)
+meetings_ttl_s = 900
+updates_ttl_s = 3600         # competitor feed (same for every KAM)
+
+[llm]
+model = "sarvam-105b-conversations"
+prompt_version = "kam-digest-v1"
+ab_models = ["sarvam-105b-conversations", "sarvam-m"]
+# Prices: [llm.prices] in support/config.toml (one price table for every teammate).
+
+# The fixed competitor sources the feed tool reads. Anything else is dropped. ASSUMED: these
+# are fictional demo feeds (mocked); replace with the real newsroom/blog feeds.
+[[sources]]
+name = "ZetaPay newsroom"
+competitor = "ZetaPay"
+url = "https://news.zetapay.example/"
+
+[[sources]]
+name = "OrbitPOS engineering blog"
+competitor = "OrbitPOS"
+url = "https://blog.orbitpos.example/"
+
+[[sources]]
+name = "KiranaCloud product updates"
+competitor = "KiranaCloud"
+url = "https://updates.kiranacloud.example/"

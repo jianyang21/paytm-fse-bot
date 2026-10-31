@@ -23,7 +23,9 @@ import hmac
 import json
 import logging
 import re
+import time
 from collections import Counter
+from collections.abc import Callable
 from datetime import date
 from functools import cache
 from pathlib import Path
@@ -33,10 +35,20 @@ import requests
 from flask import Blueprint, Response, g, jsonify, redirect, request, url_for
 from jinja2 import Environment
 
+from teammates import guard
 from teammates.collections.store import DEMO_AREA_TARGETS, LoanStore
 from teammates.fse import tracing
 from teammates.fse.store import ist_today
 from teammates.fse.tracing import span
+from teammates.guard import (
+    EMAIL_RE,
+    INJECTION_RE,
+    LONG_DIGITS_RE,
+    PAN_RE,
+    URL_RE,
+    mask_email,
+    text_problems,
+)
 from teammates.llm.client import ChatRequest, LLMError, Message
 from teammates.llm.rate_limit import RateLimiterUnavailable, RateLimitExceeded
 from teammates.runtime import MODEL, env, llm, rate_limiter, redis_client
@@ -57,19 +69,8 @@ MAX_DPD_FOR_NEW_LOAN = 30
 CHECK_LABELS = {"background": "Background audit", "credit": "Credit score",
                 "financials": "Business financials", "purpose": "Plan for the money"}
 
-EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(\.[\w-]+)+")
-URL_RE = re.compile(r"https?://|www\.", re.I)
-LONG_DIGITS_RE = re.compile(  # phone / account no. / Aadhaar (4-4-4) / phone (5-5)
-    r"\d{10,}|\b\d{4}[\s-]\d{4}[\s-]\d{4}\b|\b\d{5}[\s-]\d{5}\b")
-PAN_RE = re.compile(r"\b[A-Z]{5}\d{4}[A-Z]\b")
-NUMBER_RE = re.compile(r"\d[\d,]*")
 TRAILING_VERDICT_RE = re.compile(r"(?<=[.!?])\s*(recommendation:\s*)?(can|cannot)\.?$", re.I)
 CAPITALISED_RUN_RE = re.compile(r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+")
-INJECTION_RE = re.compile(
-    r"ignore\s+(all\s+|any\s+|the\s+)?(previous|prior|above|earlier|rules|instructions)"
-    r"|disregard\s+(the\s+|all\s+)?(rules|instructions)|system\s+prompt|you\s+are\s+now"
-    r"|pretend\s+(to\s+be|you)|\b(system|assistant)\s*:|<<<|>>>|```", re.I)
-
 
 @cache
 def loan_store() -> LoanStore:
@@ -96,11 +97,6 @@ def inr(n: int) -> str:
     return f"₹{n:,}"
 
 
-def mask_email(email: str) -> str:
-    user, _, domain = email.partition("@")
-    return f"{user[:2]}***@{domain}"
-
-
 jinja = Environment(autoescape=True)
 jinja.filters["inr"] = inr
 jinja.globals["health"] = health
@@ -113,22 +109,6 @@ def name_candidates(text: str) -> list[str]:
         w = run.split()
         out |= {" ".join(w[i:i + n]) for n in (2, 3) for i in range(len(w) - n + 1)}
     return sorted(out)
-
-
-def text_problems(text: str, facts: str) -> list[str]:
-    """Output guard for LLM text: no PII or links, and no number that isn't in the facts it
-    was given (small counts up to 10 are allowed)."""
-    problems = []
-    if LONG_DIGITS_RE.search(text):
-        problems.append("phone/account-like number")
-    if EMAIL_RE.search(text):
-        problems.append("email address")
-    if URL_RE.search(text):
-        problems.append("link")
-    known = {n.replace(",", "") for n in NUMBER_RE.findall(facts)} | {str(i) for i in range(11)}
-    if invented := sorted({n.replace(",", "") for n in NUMBER_RE.findall(text)} - known):
-        problems.append("numbers not in the data: " + ", ".join(invented[:5]))
-    return problems
 
 
 # === Daily brief ==========================================================================
@@ -205,23 +185,15 @@ def draft_summary(facts: str) -> str | None:
 
 def recipient_problems(m: dict[str, Any]) -> list[str]:
     """Output guard: the brief goes only to a verified, active collection manager."""
-    problems = []
-    if not m["email_verified"]:
-        problems.append("recipient email not verified")
-    if m["role"] != "collection_manager":
-        problems.append(f"role {m['role']} does not receive the brief")
-    if not EMAIL_RE.fullmatch(m["email"]):
-        problems.append("recipient email invalid")
-    if not m["areas"]:
-        problems.append("no areas assigned")
-    return problems
+    return guard.recipient_problems(m["email"], verified=m["email_verified"], role=m["role"],
+                                    want_role="collection_manager", scope=m["areas"],
+                                    what="brief", scope_name="areas")
 
 
 def scope_problems(d: dict[str, Any], areas: list[str]) -> list[str]:
     """Output guard: every row in the brief belongs to one of the manager's areas."""
-    rows = d["loans"] + d["pending"] + d["targets"]
-    outside = sorted({r["area"] for r in rows} - set(areas))
-    return [f"data outside the manager's areas: {', '.join(outside)}"] if outside else []
+    return guard.scope_problems((r["area"] for r in d["loans"] + d["pending"] + d["targets"]),
+                                areas, "manager's areas")
 
 
 def build_brief(s: LoanStore, m: dict[str, Any], today: date) -> tuple[str, str] | None:
@@ -290,8 +262,11 @@ BRIEF = jinja.from_string("""\
 </div>""")
 
 
-def deliver_email(to: str, subject: str, html: str
-                  ) -> tuple[bool, int | None, str | None, str | None]:
+# (ok, http_status, error, email_id)
+Delivery = tuple[bool, int | None, str | None, str | None]
+
+
+def deliver_email(to: str, subject: str, html: str) -> Delivery:
     """POST to Resend through the shared rate limiter -> (ok, http_status, error, email_id)."""
     try:
         rate_limiter(*RESEND_LIMIT).acquire()
@@ -313,18 +288,31 @@ def deliver_email(to: str, subject: str, html: str
     return True, r.status_code, None, email_id
 
 
-def send_email(s: LoanStore, to: str, subject: str, html: str) -> bool:
-    """Resend send, traced and recorded in message_log (kind 'email', recipient masked)."""
-    with span("resend.send", to=mask_email(to)) as sp:
-        ok, status, error, email_id = deliver_email(to, subject, html)
+def send_email(s: Any, to: str, subject: str, html: str,
+               deliver: Callable[[str, str, str], Delivery] | None = None, attempts: int = 1,
+               backoff_s: float = 2.0, sleep: Callable[[float], None] = time.sleep,
+               span_name: str = "resend.send") -> bool:
+    """Send through `deliver` (default Resend), traced; every attempt is a message_log row
+    (kind 'email', recipient masked). A failed attempt is retried up to `attempts` times
+    with linear backoff, then recorded as failed on the span. Shared by every teammate's
+    scheduled email (collections brief, KAM digest)."""
+    deliver = deliver or deliver_email  # looked up per call so tests can patch it
+    with span(span_name, to=mask_email(to)) as sp:
+        for attempt in range(1, attempts + 1):
+            ok, status, error, email_id = deliver(to, subject, html)
+            try:
+                s.log_message("out", to, "email", subject, ok, http_status=status,
+                              error=error, message_uuid=email_id)
+            except Exception as exc:  # the log must never block a send
+                log.warning("message_log write failed: %s", exc)
+            if ok or attempt == attempts:
+                break
+            sleep(backoff_s * attempt)
         sp.attrs.update(http_status=status, email_id=email_id)
+        if attempts > 1:
+            sp.attrs["attempts"] = attempt
         if not ok:
-            sp.fail(f"Resend rejected email: {error}")
-        try:
-            s.log_message("out", to, "email", subject, ok, http_status=status, error=error,
-                          message_uuid=email_id)
-        except Exception as exc:  # the log must never block a send
-            log.warning("message_log write failed: %s", exc)
+            sp.fail(f"email rejected after {attempt} attempt(s): {error}")
     return ok
 
 
