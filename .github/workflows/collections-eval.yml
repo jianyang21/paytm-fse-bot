@@ -1,0 +1,68 @@
+# Collections brief email eval: a week of 9 am runs through the real scheduler, numbers checked
+# against an independent ledger, recipient/scope/draft guards attacked, Redis reconciliation
+# under direct DB writes, and injected faults, on a throwaway Postgres schema.
+# Runs every day at 06:10 IST, or by hand:
+#   gh workflow run collections-eval.yml -f borrowers=200
+# Needs the repo secret TEST_DATABASE_URL (Neon, direct non -pooler string). Results: the run's
+# summary page (every metric, pass/fail, failure details) + the "collections-eval-report" artifact.
+# A failed metric fails the run, and GitHub emails the repo owner.
+name: collections-eval
+on:
+  schedule:
+    - cron: "40 0 * * *" # 06:10 IST (UTC + 5:30)
+  workflow_dispatch:
+    inputs:
+      borrowers:
+        description: "How many simulated borrowers"
+        default: "60"
+      seed:
+        description: "Random seed (same seed = same scenario)"
+        default: "7"
+jobs:
+  collections-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+      BORROWERS: ${{ inputs.borrowers || '60' }}
+      SEED: ${{ inputs.seed || '7' }}
+      OUT: reports/collections_eval/latest.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install ".[dev]"
+      - name: Run eval
+        run: |
+          test -n "$TEST_DATABASE_URL" || { echo "Set the repo secret TEST_DATABASE_URL"; exit 1; }
+          python -m teammates.collections.evals --borrowers "$BORROWERS" --seed "$SEED" --out "$OUT"
+      - name: Summary
+        if: always()
+        run: |
+          python - <<'EOF'
+          import json, os
+          path = os.environ["OUT"]
+          if not os.path.exists(path):
+              raise SystemExit("no report: the eval crashed before finishing, see the step above")
+          r = json.load(open(path))
+          cell = lambda s: str(s).replace("|", "\\|").replace("\n", " ")
+          md = [f"## Collections email eval: {'✅ all passed' if r['passed'] else '❌ failed'}", "",
+                f"{r['borrowers']} borrowers, seed {r['seed']}, run at {r['run_at']}", "",
+                "| Metric | Score | Threshold | Checks |", "|---|---|---|---|"]
+          for name, m in r["metrics"].items():
+              mark = "✅" if m["passed"] else "❌"
+              md.append(f"| {name} | {mark} {m['score']:.3f} | {m['threshold']} | {m['checks']} |")
+          for name, m in r["metrics"].items():
+              if m["failures"]:
+                  md += ["", f"### {name}: what failed", ""]
+                  md += [f"- {cell(f)}" for f in m["failures"]]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
+              f.write("\n".join(md) + "\n")
+          EOF
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: collections-eval-report
+          path: reports/collections_eval
