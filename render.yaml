@@ -17,3 +17,7 @@ services:
         sync: false
       - key: FSE_PHONE
         sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false

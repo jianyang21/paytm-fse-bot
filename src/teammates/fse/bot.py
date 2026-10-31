@@ -2,18 +2,17 @@
 
     python -m teammates.fse.bot           # webhook server (POST /webhook, /status) + IST scheduler
     python -m teammates.fse.bot morning   # send today's plan right now (or: evening)
+
+Needs DATABASE_URL (Postgres). REDIS_URL is optional: without it every read goes to Postgres.
 """
 
 import logging
 import os
 import re
-import sqlite3
 import sys
 import threading
 import time
-from collections.abc import Iterator
-from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -23,42 +22,18 @@ import requests
 from flask import Flask, request
 
 from teammates.config import load_settings, read_env_file
+from teammates.fse.store import IST, REASONS, Store, ist_today
 from teammates.llm.adapters.sarvam import SarvamClient
 from teammates.llm.client import ChatRequest, LLMClient, LLMError, Message
 from teammates.llm.rate_limit import RedisSlidingWindowRateLimiter
 
 log = logging.getLogger(__name__)
 _FILE_ENV = read_env_file(Path(".env"))
-IST = timezone(timedelta(hours=5, minutes=30))  # servers run on UTC
 VONAGE_URL = "https://messages-sandbox.nexmo.com/v1/messages"
 MODEL = "sarvam-105b-conversations"  # same as orchestrator planner
 REMINDER = "🪪 Carry your Paytm ID card, Aadhaar and driving licence."
-REASONS = {  # code -> list row title (WhatsApp max 24 chars)
-    "unavailable": "Merchant not available",
-    "closed": "Shop closed",
-    "stock": "Device/stock unavailable",
-    "not_interested": "Merchant not interested",
-    "no_time": "Ran out of time",
-    "rescheduled": "Rescheduled",
-    "other": "Other (type it)",
-}
 
-# ponytail: dummy tasks seeded per day; swap for the real merchant/task feed.
-DAILY_TASKS = [  # (merchant, kind, priority 1=highest, effort 1-3)
-    ("Sri Medicals", "QR replacement", 2, 1),
-    ("Ravi Stores", "Multi-Soundbox install x3", 1, 3),
-    ("Green Leaf Cafe", "Soundbox service visit", 3, 1),
-    ("Lakshmi Bakery", "New merchant onboarding", 1, 2),
-    ("Anand Kirana", "KYC re-verification", 2, 2),
-]
-
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS fse(id INTEGER PRIMARY KEY, name TEXT, phone TEXT UNIQUE, area TEXT);
-CREATE TABLE IF NOT EXISTS task(id INTEGER PRIMARY KEY, fse_id INT, day TEXT, merchant TEXT,
-    kind TEXT, priority INT, effort INT, done INT DEFAULT 0, reason TEXT,
-    UNIQUE(fse_id, day, merchant));
-CREATE TABLE IF NOT EXISTS feedback(id INTEGER PRIMARY KEY, fse_id INT, at TEXT, body TEXT);
-"""
+Task = dict[str, Any]
 
 
 def env(key: str, default: str = "") -> str:
@@ -69,35 +44,22 @@ def digits(phone: str) -> str:
     return re.sub(r"\D", "", phone)
 
 
-@contextmanager
-def db() -> Iterator[sqlite3.Connection]:
-    con = sqlite3.connect(env("DB_PATH", "fse.db"))
-    con.row_factory = sqlite3.Row
-    try:
-        con.executescript(SCHEMA)
-        if phone := digits(env("FSE_PHONE")):
-            con.execute(
-                "INSERT OR IGNORE INTO fse(name, phone, area) VALUES (?, ?, ?)",
-                ("Anbuselvan", phone, "Bellandur"),
-            )
-        yield con
-        con.commit()
-    finally:
-        con.close()
+@cache
+def redis_client() -> redis.Redis | None:
+    url = env("REDIS_URL")
+    if not url:
+        return None
+    return redis.Redis.from_url(url, socket_timeout=2, socket_connect_timeout=2,
+                                health_check_interval=30)
 
 
-def today_tasks(con: sqlite3.Connection, fse_id: int) -> list[sqlite3.Row]:
-    """Today's tasks, hardest/highest priority first. Ranking is code, never the LLM."""
-    day = datetime.now(IST).date().isoformat()
-    con.executemany(
-        "INSERT OR IGNORE INTO task(fse_id, day, merchant, kind, priority, effort)"
-        " VALUES (?, ?, ?, ?, ?, ?)",
-        [(fse_id, day, *t) for t in DAILY_TASKS],
-    )
-    return con.execute(
-        "SELECT * FROM task WHERE fse_id = ? AND day = ? ORDER BY priority, effort DESC, id",
-        (fse_id, day),
-    ).fetchall()
+@cache
+def store() -> Store:
+    s = Store(env("DATABASE_URL"), cache=redis_client())
+    s.migrate()
+    if phone := digits(env("FSE_PHONE")):
+        s.seed_demo(phone)
+    return s
 
 
 # --- LLM ---------------------------------------------------------------------------------
@@ -111,8 +73,10 @@ class _Unlimited:
 @cache
 def llm() -> LLMClient:
     s = load_settings()
+    r = redis_client()
     try:
-        r = redis.Redis.from_url(s.redis_url.get_secret_value(), socket_connect_timeout=2)
+        if r is None:
+            raise redis.ConnectionError("REDIS_URL not set")
         r.ping()
         limiter = RedisSlidingWindowRateLimiter(r)
     except redis.RedisError:
@@ -122,7 +86,7 @@ def llm() -> LLMClient:
     return SarvamClient(s.sarvam_api_key, limiter, base_url=s.sarvam_base_url)
 
 
-def morning_text(fse: sqlite3.Row, tasks: list[sqlite3.Row]) -> str:
+def morning_text(fse: dict[str, Any], tasks: list[Task]) -> str:
     lines = "\n".join(f"{i}. {t['kind']} - {t['merchant']}" for i, t in enumerate(tasks, 1))
     first = tasks[0]
     text = (
@@ -171,30 +135,32 @@ def send_list(to: str, body: str, button: str, section: str, rows: list[dict[str
                      "custom": {"type": "interactive", "interactive": interactive}})
 
 
-def ask_why(to: str, tasks: list[sqlite3.Row]) -> None:
+def ask_why(to: str, tasks: list[Task]) -> None:
     """Ask the reason for the next unfinished task; once none are left, ask for feedback."""
-    t = next((t for t in tasks if not t["done"] and not t["reason"]), None)
+    t = next((t for t in tasks if t["status"] == "open"), None)
     if t is None:
         send_text(to, "🙏 Thanks! Any merchant feedback from today? Text or voice note works.")
         return
-    rows = [{"id": f"why:{t['id']}:{code}", "title": title} for code, title in REASONS.items()]
+    rows = [{"id": f"why:{t['day']}:{t['id']}:{code}", "title": title}
+            for code, title in REASONS.items()]
     # ponytail: no text fallback here; the sandbox renders lists (verified on phone).
     send_list(to, f"❓ {t['kind']} at {t['merchant']} wasn't done today. Why?",
               "Pick reason", "Reason", rows)
 
 
-def send_checklist(to: str, body: str, tasks: list[sqlite3.Row]) -> None:
+def send_checklist(to: str, body: str, tasks: list[Task]) -> None:
     """Native list of open tasks (tap = done); numbered text list if Vonage rejects it."""
-    open_tasks = [t for t in tasks if not t["done"]]
+    open_tasks = [t for t in tasks if t["status"] != "done"]
     if not open_tasks:
         send_text(to, body)
         return
-    rows = [{"id": f"done:{t['id']}", "title": t["merchant"][:24], "description": t["kind"][:72]}
-            for t in open_tasks[:10]]  # WhatsApp list limit
+    rows = [{"id": f"done:{t['day']}:{t['id']}", "title": t["merchant"][:24],
+             "description": t["kind"][:72]} for t in open_tasks[:10]]  # WhatsApp list limit
     if send_list(to, body, "📋 View tasks", "Tap a task when done", rows):
         return
-    numbered = "\n".join(f"{'✅' if t['done'] else '⬜'} {i}. {t['kind']} - {t['merchant']}"
-                         for i, t in enumerate(tasks, 1))
+    numbered = "\n".join(
+        f"{'✅' if t['status'] == 'done' else '⬜'} {i}. {t['kind']} - {t['merchant']}"
+        for i, t in enumerate(tasks, 1))
     send_text(to, f"{body}\n\n{numbered}\n\nReply with a task number when it's done.")
 
 
@@ -202,67 +168,61 @@ def send_checklist(to: str, body: str, tasks: list[sqlite3.Row]) -> None:
 
 
 def send_morning() -> None:
-    with db() as con:
-        plans = [(f, today_tasks(con, f["id"])) for f in con.execute("SELECT * FROM fse")]
-    for fse, tasks in plans:
+    store().ensure_partitions()  # creates next month's partitions well before they're needed
+    for fse in store().fses():
+        tasks = store().plan(fse["id"])
         send_checklist(fse["phone"], morning_text(fse, tasks), tasks)
 
 
 def send_evening() -> None:
-    with db() as con:
-        plans = [(f, today_tasks(con, f["id"])) for f in con.execute("SELECT * FROM fse")]
-    for fse, tasks in plans:
-        ask_why(fse["phone"], tasks)
+    for fse in store().fses():
+        ask_why(fse["phone"], store().plan(fse["id"]))
 
 
 def handle_inbound(m: dict[str, Any]) -> None:
     sender = digits(str(m.get("from", "")))
+    fse = store().fse_by_phone(sender)
+    if fse is None:  # public webhook: only known FSEs get answers
+        log.warning("ignoring message from unknown number")
+        return
+    s, fse_id = store(), fse["id"]
     kind = m.get("message_type")
     reply = m.get("reply") or {}
     text = str(m.get("text") or "").strip()
-    body = text or (m.get("audio") or {}).get("url") or reply.get("title")
-    action, _, rest = str(reply.get("id", "")).partition(":")
-    task_id, _, code = rest.partition(":")
-    with db() as con:
-        fse = con.execute("SELECT * FROM fse WHERE phone = ?", (sender,)).fetchone()
-        if fse is None:  # public webhook: only known FSEs get answers
-            log.warning("ignoring message from unknown number")
-            return
-        tasks = today_tasks(con, fse["id"])
-        task = con.execute("SELECT * FROM task WHERE id = ? AND fse_id = ?",
-                           (task_id, fse["id"])).fetchone()
-        n = re.fullmatch(r"(?:done\s*)?(\d+)", text, re.I) if kind == "text" else None
-        if n and 1 <= int(n[1]) <= len(tasks):
-            action, task = "done", tasks[int(n[1]) - 1]
-        pending = next((t for t in tasks if t["reason"] == "other"), None)
+    audio = (m.get("audio") or {}).get("url")
+    # Reply ids: done:<day>:<task> / why:<day>:<task>:<code>; the day picks the partition.
+    action, day_s, task_s, code = ([*str(reply.get("id", "")).split(":"), "", "", ""])[:4]
+    try:
+        day, task_id = date.fromisoformat(day_s), int(task_s)
+    except ValueError:
+        action, day, task_id = "", ist_today(), 0
+    tasks = s.plan(fse_id)
+    n = re.fullmatch(r"(?:done\s*)?(\d+)", text, re.I) if kind == "text" else None
+    if n and 1 <= int(n[1]) <= len(tasks):
+        action, day, task_id = "done", ist_today(), tasks[int(n[1]) - 1]["id"]
+    pending = next((t for t in tasks
+                    if t["reason_code"] == "other" and t["reason_text"] is None), None)
 
-        if action == "done" and task:
-            con.execute("UPDATE task SET done = 1 WHERE id = ?", (task["id"],))
-            outcome = "done"
-        elif action == "why" and task and code in REASONS:
-            con.execute("UPDATE task SET reason = ? WHERE id = ?", (code, task["id"]))
-            outcome = "other" if code == "other" else "why"
-        elif kind != "reply" and body and pending:
-            con.execute("UPDATE task SET reason = ? WHERE id = ?",
-                        (f"other: {body}", pending["id"]))
-            outcome = "why"
+    if action == "done" and s.mark_done(fse_id, day, task_id):
+        tasks = s.plan(fse_id)
+        merchant = next((t["merchant"] for t in tasks if t["id"] == task_id), "Task")
+        if left := sum(t["status"] != "done" for t in tasks):
+            send_checklist(sender, f"✅ {merchant} done. {left} left.", tasks)
         else:
-            if body:
-                con.execute("INSERT INTO feedback(fse_id, at, body) VALUES (?, ?, ?)",
-                            (fse["id"], datetime.now(IST).isoformat(timespec="seconds"), body))
-            outcome = "feedback"
-        tasks = today_tasks(con, fse["id"])
-
-    if outcome == "feedback":
-        send_text(sender, "📝 Noted, thanks!")
-    elif outcome == "other":
-        send_text(sender, f"✍️ Type why {task['merchant']} wasn't done.")
-    elif outcome == "why":
-        ask_why(sender, tasks)
-    elif left := sum(not t["done"] for t in tasks):
-        send_checklist(sender, f"✅ {task['merchant']} done. {left} left.", tasks)
+            send_text(sender, f"🎉 All {len(tasks)} tasks done today. Great work!")
+    elif action == "why" and code in REASONS and s.set_reason(fse_id, day, task_id, code):
+        if code == "other":
+            merchant = next((t["merchant"] for t in tasks if t["id"] == task_id), "this task")
+            send_text(sender, f"✍️ Type why {merchant} wasn't done.")
+        else:
+            ask_why(sender, s.plan(fse_id))
+    elif kind != "reply" and (text or audio) and pending:
+        s.set_reason(fse_id, date.fromisoformat(pending["day"]), pending["id"], "other",
+                     text or audio)
+        ask_why(sender, s.plan(fse_id))
     else:
-        send_text(sender, f"🎉 All {len(tasks)} tasks done today. Great work!")
+        s.add_feedback(fse_id, text or reply.get("title"), audio)
+        send_text(sender, "📝 Noted, thanks!")
 
 
 app = Flask(__name__)
@@ -307,6 +267,7 @@ def scheduler() -> None:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    store()  # fail fast: migrate + seed before taking traffic
     if job := {"morning": send_morning, "evening": send_evening}.get(" ".join(sys.argv[1:])):
         job()
         return

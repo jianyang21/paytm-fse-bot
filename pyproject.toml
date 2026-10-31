@@ -3,7 +3,7 @@ name = "paytm-teammates"
 version = "0.1.0"
 description = "Autonomous AI Teammates (Paytm hackathon, Track 3)"
 requires-python = ">=3.11"
-dependencies = ["pydantic>=2", "redis>=5", "flask>=3", "requests>=2.31"]
+dependencies = ["pydantic>=2", "redis>=5", "flask>=3", "requests>=2.31", "psycopg[binary,pool]>=3.2"]
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "fakeredis[lua]>=2.20"]
@@ -14,6 +14,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+teammates = ["fse/*.sql"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
