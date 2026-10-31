@@ -1,0 +1,66 @@
+# Orchestrator routing eval: accuracy, latency, tokens and cost (INR) per model.
+# Run from the Actions tab or: gh workflow run orchestrator-eval.yml -f limit=50
+# Needs the repo secret SARVAM_API_KEY. Results: the run's summary page + the "orchestrator-eval-reports" artifact.
+name: orchestrator-eval
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Only the first N cases (blank = all 1000)"
+        default: ""
+      models:
+        description: "Space-separated models"
+        default: "sarvam-105b-conversations"
+      min_accuracy:
+        description: "Fail the run if any model's accuracy % is below this"
+        default: "97"
+jobs:
+  orchestrator-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+    env:
+      SARVAM_API_KEY: ${{ secrets.SARVAM_API_KEY }}
+      REDIS_URL: redis://localhost:6379/0
+      OUT: reports/orchestrator_eval_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install .
+      - name: Run eval
+        run: |
+          python -m teammates.orchestrator.eval --models ${{ inputs.models }} --out-dir "$OUT" \
+            ${{ inputs.limit && format('--limit {0}', inputs.limit) || '' }}
+      - name: Summary and accuracy gate
+        env:
+          MIN_ACCURACY: ${{ inputs.min_accuracy }}
+        run: |
+          python - <<'EOF'
+          import json, os
+          runs = json.load(open(f"{os.environ['OUT']}/comparison.json"))
+          floor = float(os.environ["MIN_ACCURACY"])
+          lines = ["| Model | Accuracy | Correct | p50 ms | p95 ms | Cost INR | INR/query |",
+                   "|---|---|---|---|---|---|---|"]
+          for r in runs:
+              lat = r["latency"]
+              lines.append(f"| {r['label']} | {r['accuracy_pct']}% | {r['correct']}/{r['total_queries']} "
+                           f"| {lat['p50_ms']:.0f} | {lat['p95_ms']:.0f} | {r['cost_inr_total']:.2f} "
+                           f"| {r['cost_inr_per_query']:.4f} |")
+          lines += ["", f"Gate: accuracy >= {floor}%"]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+              f.write("\n".join(lines) + "\n")
+          low = [r["label"] for r in runs if r["accuracy_pct"] < floor]
+          if low:
+              raise SystemExit(f"Below {floor}% accuracy: {low}")
+          EOF
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: orchestrator-eval-reports
+          path: reports/orchestrator_eval_ci
