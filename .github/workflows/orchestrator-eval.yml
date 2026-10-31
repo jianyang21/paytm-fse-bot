@@ -1,8 +1,12 @@
 # Orchestrator routing eval: accuracy, latency, tokens and cost (INR) per model.
-# Run from the Actions tab or: gh workflow run orchestrator-eval.yml -f limit=50
-# Needs the repo secret SARVAM_API_KEY. Results: the run's summary page + the "orchestrator-eval-reports" artifact.
+# Runs every day at 06:00 IST on all 1000 cases (~INR 11.5), or by hand:
+#   gh workflow run orchestrator-eval.yml -f limit=50
+# Needs the repo secret SARVAM_API_KEY. Results: the run's summary page (metrics, accuracy per
+# label, every wrong case) + the "orchestrator-eval-reports" artifact (full JSON).
 name: orchestrator-eval
 on:
+  schedule:
+    - cron: "30 0 * * *" # 06:00 IST (UTC + 5:30)
   workflow_dispatch:
     inputs:
       limit:
@@ -26,6 +30,10 @@ jobs:
       SARVAM_API_KEY: ${{ secrets.SARVAM_API_KEY }}
       REDIS_URL: redis://localhost:6379/0
       OUT: reports/orchestrator_eval_ci
+      # Scheduled runs have no inputs, so these fall back to the defaults.
+      MODELS: ${{ inputs.models || 'sarvam-105b-conversations' }}
+      MIN_ACCURACY: ${{ inputs.min_accuracy || '97' }}
+      LIMIT: ${{ inputs.limit }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -35,26 +43,47 @@ jobs:
       - run: pip install .
       - name: Run eval
         run: |
-          python -m teammates.orchestrator.eval --models ${{ inputs.models }} --out-dir "$OUT" \
-            ${{ inputs.limit && format('--limit {0}', inputs.limit) || '' }}
+          python -m teammates.orchestrator.eval --models $MODELS --out-dir "$OUT" \
+            ${LIMIT:+--limit "$LIMIT"}
       - name: Summary and accuracy gate
-        env:
-          MIN_ACCURACY: ${{ inputs.min_accuracy }}
         run: |
           python - <<'EOF'
           import json, os
-          runs = json.load(open(f"{os.environ['OUT']}/comparison.json"))
+          from collections import Counter
+          out = os.environ["OUT"]
+          runs = json.load(open(f"{out}/comparison.json"))
           floor = float(os.environ["MIN_ACCURACY"])
-          lines = ["| Model | Accuracy | Correct | p50 ms | p95 ms | Cost INR | INR/query |",
-                   "|---|---|---|---|---|---|---|"]
+          cell = lambda s: str(s).replace("|", "\\|").replace("\n", " ")
+          flow = lambda ws: "+".join(ws) or "(none)"
+          md = ["## Metrics", "",
+                "| Model | Accuracy | Correct | p50 ms | p95 ms | Escalations | Cost INR | INR/query |",
+                "|---|---|---|---|---|---|---|---|"]
           for r in runs:
               lat = r["latency"]
-              lines.append(f"| {r['label']} | {r['accuracy_pct']}% | {r['correct']}/{r['total_queries']} "
-                           f"| {lat['p50_ms']:.0f} | {lat['p95_ms']:.0f} | {r['cost_inr_total']:.2f} "
-                           f"| {r['cost_inr_per_query']:.4f} |")
-          lines += ["", f"Gate: accuracy >= {floor}%"]
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
-              f.write("\n".join(lines) + "\n")
+              ok = "✅" if r["accuracy_pct"] >= floor else "❌"
+              md.append(f"| {r['label']} | {ok} {r['accuracy_pct']}% | {r['correct']}/{r['total_queries']} "
+                        f"| {lat['p50_ms']:.0f} | {lat['p95_ms']:.0f} | {r['escalations']} "
+                        f"| {r['cost_inr_total']:.2f} | {r['cost_inr_per_query']:.4f} |")
+          md += ["", f"Gate: every model needs accuracy >= {floor}%"]
+          for r in runs:
+              md += ["", f"## {r['label']}: accuracy by expected workflow", "",
+                     "| Expected | Correct | Accuracy |", "|---|---|---|"]
+              for label, a in sorted(r["accuracy_by_label"].items(), key=lambda kv: kv[1]["accuracy_pct"]):
+                  mark = " ⚠️" if a["accuracy_pct"] < 100 else ""
+                  md.append(f"| {label}{mark} | {a['correct']}/{a['total']} | {a['accuracy_pct']}% |")
+              wrong = [c for c in json.load(open(f"{out}/{r['label']}_details.json")) if not c["correct"]]
+              if not wrong:
+                  continue
+              confusion = Counter((flow(c["expected"]), flow(c["execution_order"])) for c in wrong)
+              md += ["", f"## {r['label']}: where it breaks ({len(wrong)} wrong)", "",
+                     "| Expected | Routed to | Count |", "|---|---|---|"]
+              md += [f"| {e} | {g} | {n} |" for (e, g), n in confusion.most_common()]
+              md += ["", "| Id | Query | Expected | Routed to | Routing | Guardrail |",
+                     "|---|---|---|---|---|---|"]
+              md += [f"| {c['id']} | {cell(c['query'])} | {flow(c['expected'])} | {flow(c['execution_order'])} "
+                     f"| {c['routing']} | {c['guardrail_status']} |" for c in wrong]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
+              f.write("\n".join(md) + "\n")
           low = [r["label"] for r in runs if r["accuracy_pct"] < floor]
           if low:
               raise SystemExit(f"Below {floor}% accuracy: {low}")
